@@ -1,0 +1,24 @@
+{
+  "name": "khem",
+  "version": "1.0.0",
+  "description": "A homoiconic, DOM-compiling scripting language.",
+  "main": "src/index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "node examples/node_test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/errgrab/khem.git"
+  },
+  "keywords": [],
+  "author": "ErikG",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/errgrab/khem/issues"
+  },
+  "homepage": "https://github.com/errgrab/khem#readme"
+}

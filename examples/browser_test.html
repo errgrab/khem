@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+    <div id="app"></div>
+
+    <script type="module">
+        import { run } from '../src/index.js';
+
+        const khemCode = `
+            div "container" {
+                text "<h1>Compiled natively in the browser!</h1>"
+            }
+        `;
+
+        const compiledHTML = run(khemCode);
+        document.getElementById('app').innerHTML = compiledHTML;
+    </script>
+</body>
+</html>
