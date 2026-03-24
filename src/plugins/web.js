@@ -72,10 +72,21 @@ export function loadWebLib(env) {
   });
 
   c["input"] = (args, ctx) => {
-    const type = args[0] || "text";
-    const cls = args[1] || "";
-    const id = args[2] ? `id="${sub(args[2], ctx)}"` : "";
-    return `<input type="${type}" class="field ${cls}" ${id}>`;
+    let type = "text",
+      cls = "",
+      id = "",
+      placeholder = "";
+    if (Array.isArray(args[0])) {
+      args[0].forEach((stmt) => {
+        if (!stmt || !stmt.length) return;
+        if (stmt[0] === "type") type = sub(stmt[1], ctx);
+        if (stmt[0] === "class") cls = sub(stmt[1], ctx);
+        if (stmt[0] === "id") id = `id="${sub(stmt[1], ctx)}"`;
+        if (stmt[0] === "placeholder")
+          placeholder = `placeholder="${sub(stmt[1], ctx)}"`;
+      });
+    }
+    return `<input type="${type}" class="field ${cls}" ${id} ${placeholder}>`;
   };
 
   c["button"] = (args, ctx) => {
@@ -84,24 +95,32 @@ export function loadWebLib(env) {
       cls = "",
       rawJs = "",
       domId = "";
+
     if (Array.isArray(args[0])) {
       args[0].forEach((stmt) => {
         if (!stmt || !stmt.length) return;
-        if (stmt[0] === "text") text = sub(stmt[1], ctx);
-        if (stmt[0] === "class") cls = sub(stmt[1], ctx);
-        if (stmt[0] === "js") rawJs = sub(stmt[1], ctx);
-        if (stmt[0] === "id") domId = `id="${sub(stmt[1], ctx)}"`;
-        if (stmt[0] === "action") {
+        const cmd = stmt[0];
+        const val = stmt[1];
+
+        if (cmd === "text") text = sub(val, ctx);
+        if (cmd === "class") cls = sub(val, ctx);
+        if (cmd === "js") rawJs = sub(val, ctx);
+        if (cmd === "id") domId = `id="${sub(val, ctx)}"`;
+        if (cmd === "action") {
           actId = "act_" + ++actionCounter;
-          globalThis.khemActions[actId] = stmt[1];
+          globalThis.khemActions[actId] = val;
         }
       });
     }
-    const click = rawJs
-      ? `onclick="${rawJs}"`
+
+    const safeJs = rawJs.replace(/"/g, "&quot;");
+
+    const click = safeJs
+      ? `onclick="${safeJs}"`
       : actId
         ? `onclick="window.parent.khemExecuteAction('${actId}')"`
         : "";
+
     return `<button ${domId} class="${cls}" ${click}>${text}</button>`;
   };
 
