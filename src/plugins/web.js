@@ -17,13 +17,19 @@ export function loadWebLib(env) {
 
   let actionCounter = 0;
 
+  // --- HELPERS ---
+  const renderContent = (val, ctx) => {
+    if (Array.isArray(val)) return evaluate(val, ctx);
+    return val ?? "";
+  };
+
   // --- SEMANTIC UI WRAPPERS ---
-  c['render'] = (args, ctx) => `<div style="padding: 1.5rem;">${evaluate(args[0], ctx)}</div>`;
-  c['ui']     = (args, ctx) => `<div style="display: flex; flex-direction: column; gap: 0.75rem;">${evaluate(args[0], ctx)}</div>`;
-  c['panel']  = (args, ctx) => `<div style="border: 1px solid var(--border); background: var(--s1); padding: 1rem;">${evaluate(args[0], ctx)}</div>`;
-  c['row']    = (args, ctx) => `<div style="display: flex; gap: 0.75rem; align-items: center;">${evaluate(args[0], ctx)}</div>`;
-  c['col']    = (args, ctx) => `<div style="display: flex; flex-direction: column; flex: 1; gap: 0.5rem;">${evaluate(args[0], ctx)}</div>`;
-  c['box']    = (args, ctx) => `<div style="${sub(args[0], ctx)}">${evaluate(args[1], ctx)}</div>`;
+  c['render'] = (args, ctx) => `<div style="padding: 1.5rem;">${renderContent(args[0], ctx)}</div>`;
+  c['ui']     = (args, ctx) => `<div style="display: flex; flex-direction: column; gap: 0.75rem;">${renderContent(args[0], ctx)}</div>`;
+  c['panel']  = (args, ctx) => `<div style="border: 1px solid var(--border); background: var(--s1); padding: 1rem;">${renderContent(args[0], ctx)}</div>`;
+  c['row']    = (args, ctx) => `<div style="display: flex; gap: 0.75rem; align-items: center;">${renderContent(args[0], ctx)}</div>`;
+  c['col']    = (args, ctx) => `<div style="display: flex; flex-direction: column; flex: 1; gap: 0.5rem;">${renderContent(args[0], ctx)}</div>`;
+  c['box']    = (args, ctx) => `<div style="${sub(args[0], ctx)}">${renderContent(args[1], ctx)}</div>`;
   c['label']  = (args) => `<div style="color: var(--fg2); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 0.5rem;">${args[0]}</div>`;
   c['text']   = (args) => args[0] || "";
 
@@ -31,8 +37,14 @@ export function loadWebLib(env) {
   const tags = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section', 'main', 'header', 'footer', 'nav', 'article'];
   tags.forEach(tag => {
     c[tag] = (args, ctx) => {
-      const cls = args[0] ? `class="${sub(args[0], ctx)}"` : "";
-      return `<${tag} ${cls}>${evaluate(args[1], ctx)}</${tag}>`;
+      // If 1 arg: (tag content)
+      // If 2 args: (tag class content)
+      const hasClass = args.length > 1;
+      const classVal = hasClass ? args[0] : "";
+      const content  = hasClass ? args[1] : args[0];
+
+      const cls = classVal ? ` class="${sub(classVal, ctx)}"` : "";
+      return `<${tag}${cls}>${renderContent(content, ctx)}</${tag}>`;
     };
   });
 
