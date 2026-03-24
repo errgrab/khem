@@ -1,4 +1,4 @@
-# khem / (▲){■}
+# khem / ▲{■}
 
 **Khem** ("The Black Land") is a minimalist, homoiconic scripting language and UI compiler. It is designed to transform high-density logic into optimized HTML/CSS structures while maintaining a unified syntax for both backend compilation and frontend DOM manipulation.
 
