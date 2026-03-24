@@ -35,8 +35,26 @@ khem-lang/
 
 ## 3. Usage
 
+### Native Khem Script Tags
+Run KhemCode directly inside script tags, just like JavaScript. Any HTML returned by the script will be automatically injected into the DOM at the script's location.
+
+```html
+<!-- Load the Khem bootstrapper -->
+<script type="module" src="./src/index.js"></script>
+
+<!-- Inline Khem script -->
+<script type="text/khem">
+  div "container" {
+    h1 "" { text "Hello from Khem!" }
+  }
+</script>
+
+<!-- External Khem script -->
+<script type="text/khem" src="app.kh"></script>
+```
+
 ### Inside the Browser (Module)
-Khem is designed for the modern web. You can import the compiler directly into your HTML:
+Khem is designed for the modern web. You can import the compiler directly into your HTML for manual control:
 
 ```html
 <script type="module">

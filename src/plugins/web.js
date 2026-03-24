@@ -20,7 +20,7 @@ export function loadWebLib(env) {
   // --- HELPERS ---
   const renderContent = (val, ctx) => {
     if (Array.isArray(val)) return evaluate(val, ctx);
-    return val ?? "";
+    return sub(val, ctx) ?? "";
   };
 
   // --- SEMANTIC UI WRAPPERS ---
@@ -36,9 +36,9 @@ export function loadWebLib(env) {
     `<div style="display: flex; flex-direction: column; flex: 1; gap: 0.5rem;">${renderContent(args[0], ctx)}</div>`;
   c["box"] = (args, ctx) =>
     `<div style="${sub(args[0], ctx)}">${renderContent(args[1], ctx)}</div>`;
-  c["label"] = (args) =>
-    `<div style="color: var(--fg2); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 0.5rem;">${args[0]}</div>`;
-  c["text"] = (args) => args[0] || "";
+  c["label"] = (args, ctx) =>
+    `<div style="color: var(--fg2); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 0.5rem;">${sub(args[0], ctx)}</div>`;
+  c["text"] = (args, ctx) => sub(args[0], ctx) || "";
 
   // --- AUTOMATIC TAG GENERATOR ---
   const tags = [
@@ -111,8 +111,17 @@ export function loadWebLib(env) {
       // Global Block
       args[0].forEach((stmt) => {
         if (!stmt || stmt.length < 2) return;
-        const selector = sub(stmt[0], ctx);
-        const rules = stmt[1]
+
+        // Multi-word selectors (e.g., .header h1)
+        const selector = stmt
+          .slice(0, -1)
+          .map((s) => sub(s, ctx))
+          .join(" ");
+        const rulesBlock = stmt[stmt.length - 1];
+
+        if (!Array.isArray(rulesBlock)) return;
+
+        const rules = rulesBlock
           .map(
             (r) =>
               `${r[0]}: ${r
@@ -135,6 +144,30 @@ export function loadWebLib(env) {
       )
       .join(" ");
     return `<div style="${rules}">${evaluate(args[1], ctx)}</div>`;
+  };
+
+  // --- INTERACTIVE DOM COMMANDS ---
+  c["dom_set"] = (args, ctx) => {
+    if (typeof document === "undefined") return "";
+    const el = document.querySelector(sub(args[0], ctx));
+    if (!el) return "";
+    const path = sub(args[1], ctx).split(".");
+    let t = el;
+    for (let i = 0; i < path.length - 1; i++) t = t[path[i]];
+    t[path[path.length - 1]] = sub(args[2], ctx);
+    return "";
+  };
+
+  c["dom_on"] = (args, ctx) => {
+    if (typeof document === "undefined") return "";
+    const el = document.querySelector(sub(args[0], ctx));
+    if (!el) return "";
+    const event = sub(args[1], ctx);
+    const block = args[2];
+    el.addEventListener(event, () => {
+      evaluate(block, ctx);
+    });
+    return "";
   };
 
   c["script"] = (args, ctx) => {

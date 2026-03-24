@@ -4,22 +4,33 @@ export const createScope = (parent) => ({
   styles: parent.styles,
 });
 
-export const sub = (s, ctx) =>
-  typeof s === "string"
-    ? s.replace(/\\\$|\$([a-zA-Z0-9_-]+)/g, (m, v) =>
-        m === "\\$" ? "$" : ctx.vars[v] !== undefined ? ctx.vars[v] : m,
-      )
-    : s;
+export const sub = (s, ctx) => {
+  if (typeof s !== "string") return s;
+  const result = s.replace(/\\\$|\$([a-zA-Z0-9_-]+)/g, (m, v) => {
+    if (m === "\\$") return "$";
+    const val = ctx.vars[v];
+    return val !== undefined ? val : m;
+  });
+  return result;
+};
 
 export function evaluate(ast, ctx) {
   if (!Array.isArray(ast)) return "";
   return ast
     .map((stmt) => {
       if (!Array.isArray(stmt) || !stmt.length) return "";
-      const args = stmt.slice(1).map((arg) => sub(arg, ctx));
-      if (ctx.cmds[stmt[0]]) return ctx.cmds[stmt[0]](args, ctx) || "";
 
-      console.error(`Khem Error: Unknown command '${stmt[0]}'`);
+      const cmdName = stmt[0];
+      const rawArgs = stmt.slice(1);
+
+      const args = rawArgs.map((arg) => {
+        if (Array.isArray(arg)) return arg;
+        return sub(arg, ctx);
+      });
+
+      if (ctx.cmds[cmdName]) return ctx.cmds[cmdName](args, ctx) || "";
+
+      console.error(`Khem Error: Unknown command '${cmdName}'`);
       return "";
     })
     .join("");

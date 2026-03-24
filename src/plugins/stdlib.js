@@ -56,15 +56,95 @@ export function loadStdLib(env) {
   };
 
   c["proc"] = (args, ctx) => {
-    c[args[0]] = (callArgs, callCtx) => {
+    const name = args[0];
+    const paramsBlock = args[1];
+    const body = args[2];
+
+    c[name] = (callArgs, callCtx) => {
       let pCtx = createScope(callCtx);
-      args[1].forEach((def, i) => {
-        if (def && def.length)
-          pCtx.vars[def[0]] =
-            callArgs[i] !== undefined ? callArgs[i] : sub(def[1] || "", pCtx);
+      // Determine the real list of parameters
+      let realParams = [];
+      if (Array.isArray(paramsBlock)) {
+        // If the FIRST statement in the block is itself a block, we might have { {p1 d1} {p2 d2} }
+        if (
+          paramsBlock.length > 0 &&
+          Array.isArray(paramsBlock[0]) &&
+          Array.isArray(paramsBlock[0][0])
+        ) {
+          realParams = paramsBlock[0];
+        } else {
+          realParams = paramsBlock;
+        }
+      }
+
+      realParams.forEach((stmt, i) => {
+        if (!Array.isArray(stmt)) return;
+        const first = stmt[0];
+        if (Array.isArray(first)) {
+          const vName = first[0];
+          const vDefault = first[1] || "";
+          pCtx.vars[vName] =
+            callArgs[i] !== undefined ? callArgs[i] : sub(vDefault, pCtx);
+        } else {
+          pCtx.vars[first] = callArgs[i] !== undefined ? callArgs[i] : "";
+        }
       });
-      return evaluate(args[2], pCtx);
+
+      return evaluate(body, pCtx);
     };
     return "";
+  };
+
+  // --- UTILS ---
+  c["js"] = (args, ctx) => {
+    try {
+      const res = new Function("ctx", "return " + sub(args[0], ctx))(ctx);
+      return res !== undefined ? res.toString() : "";
+    } catch (e) {
+      return "";
+    }
+  };
+
+  c["math"] = (args, ctx) => {
+    try {
+      return new Function("ctx", "return " + sub(args[0], ctx))(ctx).toString();
+    } catch (e) {
+      return "0";
+    }
+  };
+
+  c["date"] = (args, ctx) => {
+    const cmd = args[0];
+    if (cmd === "now") return Date.now().toString();
+    if (cmd === "format") {
+      const d = new Date(parseInt(sub(args[1], ctx)));
+      return d.toLocaleDateString();
+    }
+    return "";
+  };
+
+  c["ls_set"] = (args, ctx) => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(sub(args[0], ctx), sub(args[1], ctx));
+    }
+    return "";
+  };
+
+  c["ls_get"] = (args, ctx) => {
+    if (typeof localStorage !== "undefined") {
+      const val = localStorage.getItem(sub(args[0], ctx));
+      ctx.vars[args[1]] = val || "";
+    }
+    return "";
+  };
+
+  c["eq"] = (args, ctx) =>
+    sub(args[0], ctx) === sub(args[1], ctx) ? "true" : "";
+  c["not"] = (args, ctx) => (sub(args[0], ctx) ? "" : "true");
+
+  c["join"] = (args, ctx) => {
+    const list = args.slice(0, -1).map((a) => sub(a, ctx));
+    const sep = sub(args[args.length - 1], ctx);
+    return list.join(sep);
   };
 }
