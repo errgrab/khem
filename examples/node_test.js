@@ -1,5 +1,5 @@
-import fs from 'fs';
-import { run } from '../src/index.js';
+import fs from "fs";
+import { run } from "../src/index.js";
 
 const code = `
   set title "Khem Node Test"
