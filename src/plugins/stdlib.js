@@ -7,6 +7,8 @@ const num = (v) => Number(v) || 0;
 export function loadStdLib(env) {
   const c = env.cmds;
 
+  c["text"] = (args) => args[0] ?? "";
+
   c["set"] = (args, scope) => {
     scope.vars[args[0]] = args[1] ?? "";
     return null;

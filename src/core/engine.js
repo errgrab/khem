@@ -3,9 +3,23 @@ export const createScope = (parent = null) => ({
   parent,
 });
 
-export function sub(text, scope) {
+export function sub(text, scope, webMode = false) {
   if (typeof text !== "string") return text;
+  if (webMode) {
+    return text.replace(/\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g, (match, name) => {
+      const value = scope?.vars?.[name] ?? scope?.parent?.vars?.[name];
+      return value !== undefined ? String(value) : match;
+    });
+  }
   return text.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (match, name) => {
+    const value = scope?.vars?.[name] ?? scope?.parent?.vars?.[name];
+    return value !== undefined ? String(value) : match;
+  });
+}
+
+export function subForPage(text, scope) {
+  if (typeof text !== "string") return text;
+  return text.replace(/\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g, (match, name) => {
     const value = scope?.vars?.[name] ?? scope?.parent?.vars?.[name];
     return value !== undefined ? String(value) : match;
   });
@@ -41,7 +55,7 @@ export function evaluate(commands, scope, env) {
         const result = evaluate(arg, scope, env);
         return result.join(" ");
       }
-      return sub(arg, scope);
+      return sub(arg, scope, env.webMode);
     });
 
     const result = command(args, scope, env, rawArgs);

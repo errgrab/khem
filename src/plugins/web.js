@@ -40,7 +40,7 @@ export function loadWebLib(env) {
   };
 
   c["page"] = (args, scope, env, rawArgs) => {
-    webPages[args[0]] = rawArgs?.[1] ?? args[1];
+    webPages[args[0]] = rawArgs?.[1] ?? args[1] ?? "";
     return null;
   };
 
@@ -109,7 +109,7 @@ export function loadWebLib(env) {
     const rendered = renderInner(content, scope, env);
     if (actionStr && typeof actionStr === "string") {
       const actId = "act_" + (++actionCounter);
-      webActions[actId] = actionStr;
+      webActions[actId] = actionStr.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, "{{$1}}");
       return `<button${clsAttr} onclick="khemAct('${actId}')">${rendered}</button>`;
     }
     return `<button${clsAttr}>${rendered}</button>`;
@@ -285,11 +285,13 @@ select.field { cursor: pointer; }
 export function generateHTML(env, code) {
   const css = DEFAULT_CSS + webStyles.join("\n");
   
-  // Pre-render all pages to HTML templates
+  // Render pages to HTML, then convert $var to {{var}} for client-side reactivity
   const htmlTemplates = {};
   for (const [name, pageBody] of Object.entries(webPages)) {
     const scope = { vars: { ...webState }, parent: null };
-    htmlTemplates[name] = evaluate(parse(pageBody), scope, env).join("");
+    const rendered = evaluate(parse(pageBody), scope, env).join("");
+    // Convert $var to {{var}} in the rendered HTML
+    htmlTemplates[name] = rendered.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, "{{$1}}");
   }
   
   // Get default page
@@ -316,7 +318,7 @@ export function generateHTML(env, code) {
 
     function sub(s) {
       if (typeof s !== "string") return s;
-      return s.replace(/\\$([a-zA-Z_][a-zA-Z0-9_]*)/g, function(m, k) {
+      return s.replace(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, function(m, k) {
         return S[k] !== undefined ? S[k] : m;
       });
     }
@@ -359,7 +361,7 @@ export function generateHTML(env, code) {
         if (em) {
           var inner = em[1];
           if (inner.startsWith("expr ")) {
-            var expr = inner.slice(5).replace(/\\$([a-zA-Z_][a-zA-Z0-9_]*)/g, function(_, k) {
+            var expr = inner.slice(5).replace(/\\{\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}\\}/g, function(_, k) {
               return S[k] || "0";
             });
             try { S[name] = String(eval(expr)); } catch(e) { S[name] = "0"; }
