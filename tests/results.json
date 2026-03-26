@@ -1,0 +1,58 @@
+{
+  "passed": 9,
+  "failed": 2,
+  "suites": {
+    "parser": [
+      {
+        "name": "parse: empty string",
+        "pass": true
+      },
+      {
+        "name": "parse: simple command",
+        "pass": true
+      },
+      {
+        "name": "parse: command with multiple args",
+        "pass": true
+      }
+    ],
+    "stdlib": [
+      {
+        "name": "stdlib: puts outputs",
+        "pass": false,
+        "msg": "puts did not output"
+      },
+      {
+        "name": "stdlib: set/get",
+        "pass": false,
+        "msg": "get did not return set value"
+      }
+    ],
+    "web": [
+      {
+        "name": "web: page renders",
+        "pass": true
+      },
+      {
+        "name": "web: title set",
+        "pass": true
+      },
+      {
+        "name": "web: state variable",
+        "pass": true
+      },
+      {
+        "name": "web: button renders",
+        "pass": true
+      },
+      {
+        "name": "web: input renders",
+        "pass": true
+      },
+      {
+        "name": "web: default CSS includes design system",
+        "pass": true
+      }
+    ]
+  }
+}

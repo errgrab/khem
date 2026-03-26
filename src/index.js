@@ -1,7 +1,7 @@
 import { parse } from "./core/parser.js";
 import { evaluate, render, createScope, sub } from "./core/engine.js";
 import { loadStdLib } from "./plugins/stdlib.js";
-import { loadWebLib, generateHTML } from "./plugins/web.js";
+import { loadWebLib, generateHTML, resetWebState } from "./plugins/web.js";
 
 export function createEnvironment(webMode = false) {
   const env = {
@@ -60,4 +60,4 @@ export function processScriptTags(html) {
   );
 }
 
-export { parse, evaluate, render, createScope, sub };
+export { parse, evaluate, render, createScope, sub, resetWebState };

@@ -33,10 +33,16 @@ export function parse(code) {
       while (i < len && /[ \t\r]/.test(code[i])) i++;
       if (i >= len) break;
 
-      // Semicolon or newline ends command
-      if (code[i] === ';' || code[i] === '\n') break;
+    // Semicolon or newline ends command
+    if (code[i] === ';' || code[i] === '\n') break;
 
-      // Command substitution [ ... ]
+    // Comment inside command
+    if (code[i] === '#') {
+      while (i < len && code[i] !== '\n') i++;
+      break;
+    }
+
+    // Command substitution [ ... ]
       if (code[i] === '[') {
         i++; // skip [
         let depth = 1, start = i;

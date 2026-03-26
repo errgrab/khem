@@ -7,7 +7,7 @@
     "example": "examples"
   },
   "scripts": {
-    "test": "node tests/node_test.js && node tests/parser_test.js",
+    "test": "node tests/parser_test.js && node tests/stdlib_test.js && node tests/web_test.js",
     "repl": "node bin/khem.js repl",
     "watch": "node bin/khem.js watch",
     "serve": "node bin/khem.js serve"

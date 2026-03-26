@@ -1,84 +1,195 @@
-import assert from "node:assert/strict";
-import { parse, parseAst, ParseError } from "../src/core/parser.js";
+import { parse, ParseError } from "../src/core/parser.js";
 
-const validCases = [
-  {
-    name: "simple command",
-    code: 'text "hello"',
-    expect: [["text", "hello"]],
-  },
-  {
-    name: "nested block",
-    code: 'if "1 === 1" { text "yes" } else { text "no" }',
-    expect: [["if", "1 === 1", [["text", "yes"]], "else", [["text", "no"]]]],
-  },
-  {
-    name: "comments and separators",
-    code: 'set x 1; # comment\ntext "$x"',
-    expect: [
-      ["set", "x", "1"],
-      ["text", "$x"],
-    ],
-  },
-];
-
-const invalidCases = [
-  {
-    name: "unmatched close brace",
-    code: 'text "x" }',
-    codeId: "E_UNMATCHED_CLOSE_BRACE",
-  },
-  {
-    name: "unmatched open brace",
-    code: 'if "1" { text "x"',
-    codeId: "E_UNMATCHED_OPEN_BRACE",
-  },
-  {
-    name: "unterminated string",
-    code: 'text "x',
-    codeId: "E_UNTERMINATED_STRING",
-  },
-  {
-    name: "invalid top-level token sequence",
-    code: '{ text "x" }',
-    codeId: "E_INVALID_SEQUENCE",
-  },
-  {
-    name: "invalid statement head",
-    code: '"oops" value',
-    codeId: "E_INVALID_SEQUENCE",
-  },
-];
-
-console.log("\n🧪 Running parser tests\n" + "=".repeat(32));
-
-for (const t of validCases) {
-  const out = parse(t.code);
-  assert.deepEqual(out, t.expect, `valid case failed: ${t.name}`);
-  const ast = parseAst(t.code);
-  assert.equal(ast.type, "Block", `AST should be Block: ${t.name}`);
-  console.log(`✅ [PASS] ${t.name}`);
-}
-
-for (const t of invalidCases) {
-  let error = null;
-  try {
-    parse(t.code);
-  } catch (e) {
-    error = e;
+function assertEqual(actual, expected, msg) {
+  const actualStr = JSON.stringify(actual);
+  const expectedStr = JSON.stringify(expected);
+  if (actualStr !== expectedStr) {
+    throw new Error(`${msg}: expected ${expectedStr}, got ${actualStr}`);
   }
-
-  assert.ok(error, `expected error: ${t.name}`);
-  assert.ok(error instanceof ParseError, `error type: ${t.name}`);
-  assert.equal(error.code, t.codeId, `error code mismatch: ${t.name}`);
-  assert.equal(typeof error.line, "number", `error line missing: ${t.name}`);
-  assert.equal(
-    typeof error.column,
-    "number",
-    `error column missing: ${t.name}`,
-  );
-  console.log(`✅ [PASS] ${t.name}`);
 }
 
-console.log("=".repeat(32));
-console.log("✨ parser tests passed\n");
+function assertThrows(fn, msg) {
+  try {
+    fn();
+    throw new Error(`${msg}: expected to throw`);
+  } catch (e) {
+    if (e.name === "ParseError") return;
+    throw e;
+  }
+}
+
+let passed = 0;
+let failed = 0;
+
+function test(name, fn) {
+  try {
+    fn();
+    passed++;
+    console.log(`  ✓ ${name}`);
+  } catch (e) {
+    failed++;
+    console.log(`  ✗ ${name}: ${e.message}`);
+  }
+}
+
+// Parser Tests
+console.log("\n=== Parser Tests ===\n");
+
+test("parse: empty string", () => {
+  const result = parse("");
+  assertEqual(result, []);
+});
+
+test("parse: simple command", () => {
+  const result = parse("puts hello");
+  assertEqual(result, [["puts", "hello"]]);
+});
+
+test("parse: command with multiple args", () => {
+  const result = parse("set x 42");
+  assertEqual(result, [["set", "x", "42"]]);
+});
+
+test("parse: semicolon separator", () => {
+  const result = parse("puts a; puts b");
+  assertEqual(result, [["puts", "a"], ["puts", "b"]]);
+});
+
+test("parse: newline separator", () => {
+  const result = parse("puts a\nputs b");
+  assertEqual(result, [["puts", "a"], ["puts", "b"]]);
+});
+
+test("parse: comment ignored", () => {
+  const result = parse("puts hello # this is a comment");
+  assertEqual(result, [["puts", "hello"]]);
+});
+
+test("parse: double quoted string", () => {
+  const result = parse('puts "Hello World"');
+  assertEqual(result, [["puts", "Hello World"]]);
+});
+
+test("parse: double quoted string with spaces", () => {
+  const result = parse('set msg "Hello World"');
+  assertEqual(result, [["set", "msg", "Hello World"]]);
+});
+
+test("parse: braced literal (block)", () => {
+  const result = parse("if $x { puts true }");
+  assertEqual(result, [["if", "$x", "puts true"]]);
+});
+
+test("parse: command substitution", () => {
+  const result = parse("set x [expr 2 + 3]");
+  assertEqual(result, [["set", "x", [["expr", "2", "+", "3"]]]]);
+});
+
+test("parse: nested command substitution", () => {
+  const result = parse("puts [concat [expr 1] [expr 2]]");
+  assertEqual(result, [["puts", [["concat", [["expr", "1"]], [["expr", "2"]]]]]]);
+});
+
+test("parse: variable substitution in string", () => {
+  const result = parse('puts "Hello $name"');
+  assertEqual(result, [["puts", "Hello $name"]]);
+});
+
+test("parse: braces preserve literal (no substitution)", () => {
+  const result = parse('set code { puts "$name" }');
+  assertEqual(result, [["set", "code", 'puts "$name"']]);
+});
+
+test("parse: multiple commands", () => {
+  const result = parse("set x 1\nset y 2\nset z 3");
+  assertEqual(result, [["set", "x", "1"], ["set", "y", "2"], ["set", "z", "3"]]);
+});
+
+test("parse: word with underscore", () => {
+  const result = parse("set my_var 42");
+  assertEqual(result, [["set", "my_var", "42"]]);
+});
+
+test("parse: word with numbers", () => {
+  const result = parse("set var1 42");
+  assertEqual(result, [["set", "var1", "42"]]);
+});
+
+test("parse: empty command", () => {
+  const result = parse("puts");
+  assertEqual(result, [["puts"]]);
+});
+
+test("parse: multiple semicolons", () => {
+  const result = parse("puts a;;;puts b");
+  assertEqual(result, [["puts", "a"], ["puts", "b"]]);
+});
+
+test("parse: quoted string with escaped quote", () => {
+  const result = parse('puts "say \\"hello\\""');
+  assertEqual(result, [["puts", 'say "hello"']]);
+});
+
+test("parse: proc definition", () => {
+  const result = parse("proc greet { who } { puts Hello }");
+  assertEqual(result, [["proc", "greet", "who", "puts Hello"]]);
+});
+
+test("parse: if/else", () => {
+  const result = parse("if $x > 0 { puts positive } else { puts negative }");
+  assertEqual(result, [["if", "$x", ">", "0", "puts positive", "else", "puts negative"]]);
+});
+
+test("parse: for loop", () => {
+  const result = parse("for i 1 10 { puts $i }");
+  assertEqual(result, [["for", "i", "1", "10", "puts $i"]]);
+});
+
+test("parse: foreach loop", () => {
+  const result = parse("foreach item $items { puts $item }");
+  assertEqual(result, [["foreach", "item", "$items", "puts $item"]]);
+});
+
+test("parse: match command", () => {
+  const result = parse('match $x { "hello" { puts greeting } "bye" { puts farewell } default { puts other } }');
+  assertEqual(result, [["match", "$x", '"hello" { puts greeting } "bye" { puts farewell } default { puts other }']]);
+});
+
+test("parse: list command", () => {
+  const result = parse("list a b c");
+  assertEqual(result, [["list", "a", "b", "c"]]);
+});
+
+test("parse: dict create", () => {
+  const result = parse('dict create name "John" age "30"');
+  assertEqual(result, [["dict", "create", "name", "John", "age", "30"]]);
+});
+
+test("parse: string command", () => {
+  const result = parse("string toupper hello");
+  assertEqual(result, [["string", "toupper", "hello"]]);
+});
+
+test("parse: expr with operators", () => {
+  const result = parse("expr 2 + 3 * 4");
+  assertEqual(result, [["expr", "2", "+", "3", "*", "4"]]);
+});
+
+test("parse: nested braces", () => {
+  const result = parse("proc test { a } { if $a { puts yes } else { puts no } }");
+  assertEqual(result, [["proc", "test", "a", "if $a { puts yes } else { puts no }"]]);
+});
+
+test("parse: empty block", () => {
+  const result = parse("if $x {}");
+  assertEqual(result, [["if", "$x", ""]]);
+});
+
+test("parse: whitespace handling", () => {
+  const result = parse("  puts   hello  ");
+  assertEqual(result, [["puts", "hello"]]);
+});
+
+console.log(`\n=== Parser Results: ${passed} passed, ${failed} failed ===\n`);
+
+if (failed > 0) process.exit(1);

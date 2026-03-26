@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khem Test Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --s0: #101010;
+      --s1: #161616;
+      --s2: #1e1e1e;
+      --s3: #262626;
+      --border: #272727;
+      --b2: #333333;
+      --fg: #d4d0c8;
+      --fg1: #aaaaaa;
+      --fg2: #888888;
+      --fg3: #555555;
+      --dim: #484848;
+      --acc: #c8a84b;
+      --acc-dim: #7a6628;
+      --green: #6b9e78;
+      --green-dim: #2a4a33;
+      --red: #a86b6b;
+      --red-dim: #4a2222;
+      --blue: #7a8fa8;
+      --blue-dim: #2a3a4a;
+      --amber: #d4924a;
+      --mono: 'DM Mono', 'Fira Mono', ui-monospace, monospace;
+      --serif: 'Instrument Serif', Georgia, serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding: 48px 24px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-track { background: var(--bg); }
+    *::-webkit-scrollbar-thumb { background: var(--border); }
+    *::-webkit-scrollbar-thumb:hover { background: var(--b2); }
+
+    h1 {
+      font-family: var(--serif);
+      font-size: 28px;
+      font-weight: 400;
+      color: var(--fg);
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--dim);
+      margin-bottom: 32px;
+    }
+
+    .summary {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .stat-dot.pass { background: var(--green); }
+    .stat-dot.fail { background: var(--red); }
+    .stat-label {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--fg2);
+    }
+    .stat-value {
+      font-size: 14px;
+      color: var(--fg);
+    }
+
+    .suite {
+      margin-bottom: 24px;
+    }
+    .suite-header {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--acc);
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .test {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+    }
+    .test-icon {
+      width: 14px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .test-icon.pass { color: var(--green); }
+    .test-icon.fail { color: var(--red); }
+    .test-name {
+      font-size: 11px;
+      color: var(--fg1);
+      flex: 1;
+    }
+    .test-name.failed {
+      color: var(--red);
+    }
+    .test-msg {
+      font-size: 10px;
+      color: var(--dim);
+      font-family: var(--mono);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Test Results</h1>
+    <div class="subtitle">Khem Test Suite</div>
+    
+    <div class="summary" id="summary"></div>
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    async function loadResults() {
+      try {
+        const response = await fetch('results.json');
+        const data = await response.json();
+        render(data);
+      } catch (e) {
+        document.getElementById('results').innerHTML = `
+          <p style="color: var(--red);">Error loading results: ${e.message}</p>
+          <p style="color: var(--dim); font-size: 10px; margin-top: 8px;">
+            Run <code style="color: var(--acc);">node tests/run_tests.js</code> to generate results.
+          </p>`;
+      }
+    }
+
+    function render(data) {
+      const summary = document.getElementById('summary');
+      summary.innerHTML = `
+        <div class="stat">
+          <span class="stat-dot pass"></span>
+          <span class="stat-label">Passed</span>
+          <span class="stat-value">${data.passed}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-dot fail"></span>
+          <span class="stat-label">Failed</span>
+          <span class="stat-value">${data.failed}</span>
+        </div>
+      `;
+
+      const results = document.getElementById('results');
+      let html = '';
+      
+      for (const [suiteName, tests] of Object.entries(data.suites)) {
+        html += `<div class="suite"><div class="suite-header">${suiteName}</div>`;
+        for (const test of tests) {
+          const icon = test.pass ? '✓' : '✗';
+          const cls = test.pass ? 'pass' : 'fail';
+          const nameCls = test.pass ? '' : 'failed';
+          html += `<div class="test">
+            <span class="test-icon ${cls}">${icon}</span>
+            <span class="test-name ${nameCls}">${test.name}</span>
+            ${test.msg ? `<span class="test-msg">${test.msg}</span>` : ''}
+          </div>`;
+        }
+        html += '</div>';
+      }
+      
+      results.innerHTML = html;
+    }
+
+    loadResults();
+  </script>
+</body>
+</html>
