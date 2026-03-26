@@ -1,0 +1,70 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Khem",
+  "scopeName": "source.khem",
+  "fileTypes": ["kh", "khem"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#variables" },
+    { "include": "#braces" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.khem",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.khem",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.khem", "match": "\\\\." }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.khem",
+          "match": "\\b-?(?:0|[1-9]\\d*)(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.khem",
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_-]*"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.khem",
+          "match": "\\b(?:if|else|for|foreach|proc|return|try|catch|throw|match|default|import)\\b"
+        },
+        {
+          "name": "support.function.khem",
+          "match": "\\b(?:set|state|derive|persist|persist-config|expr|int|float|bool|null|list|map|filter|reduce|find|sort|length|push|pop|split|join|trim|upper|lower|slice|replace|contains|starts-with|ends-with|min|max|abs|floor|ceil|round|mod|clamp|pow|today|year-of|month-of|day-of|days-in-month|format-date|on|dom_on|dom_set|modal|tabs|toast|table|form|datepicker|document|style|text|button|input|div|span|p|h1|h2|h3|section|main|header|footer|nav|article)\\b"
+        }
+      ]
+    },
+    "braces": {
+      "patterns": [
+        { "name": "punctuation.section.block.begin.khem", "match": "\\{" },
+        { "name": "punctuation.section.block.end.khem", "match": "\\}" }
+      ]
+    }
+  }
+}

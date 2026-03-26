@@ -1,0 +1,36 @@
+document "Khem Components Showcase" {
+  style {
+    ".app" { padding 20px display flex flex-direction column gap 10px }
+    ".chips" { display flex gap 8px }
+    ".chip" { border 1px solid var(--border) padding "4px 8px" }
+  }
+
+  div "app" {
+    h1 "" { text "Component Primitives" }
+
+    modal {
+      h3 "" { text "Modal" }
+      p "" { text "This is the baseline modal primitive." }
+    }
+
+    tabs {
+      div "chips" {
+        span "chip" { text "Overview" }
+        span "chip" { text "Metrics" }
+        span "chip" { text "Logs" }
+      }
+    }
+
+    toast { text "Saved successfully" }
+
+    table {
+      div "" { text "Name — Role" }
+      div "" { text "Nyx — Operator" }
+    }
+
+    form {
+      label "" { text "Pick date" }
+      datepicker ""
+    }
+  }
+}

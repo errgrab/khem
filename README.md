@@ -145,3 +145,21 @@ To contribute or modify the engine:
 1.  **Clone the repo**: `git clone https://github.com/your-repo/khem-lang.git`
 2.  **Run the IDE**: Use a local server (like Live Server or `npx serve`) to open `ide.html`.
 3.  **Modular Plugins**: Add new commands in `src/plugins/` to extend the language.
+
+### CLI Commands
+- `khem build app.kh` — compile a Khem file to HTML (stdout)
+- `khem watch app.kh` — rebuild to `app.html` when source changes
+- `khem serve app.kh [port]` — serve compiled HTML over HTTP
+- `khem repl` — interactive REPL
+- `khem test` — run node + parser suites
+- `import "./file.kh"` — supported during CLI build/watch/serve preprocessing
+---
+
+## 7. Roadmap
+
+The long-term language roadmap is tracked in [`docs/language-roadmap.md`](docs/language-roadmap.md).
+
+## 8. Editor & Showcases
+
+- Editor grammar + completions: [`docs/editor-support.md`](docs/editor-support.md)
+- Runnable showcases: [`examples/showcases/README.md`](examples/showcases/README.md)

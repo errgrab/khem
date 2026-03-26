@@ -54,6 +54,27 @@ export function loadWebLib(env) {
   );
   c["text"] = (args, ctx) => sub(args[0], ctx) || "";
 
+  c["modal"] = compatHtmlCommand(
+    (args, ctx) =>
+      `<div class="khem-modal"><div class="khem-modal-card">${renderContent(args[0], ctx)}</div></div>`,
+  );
+  c["tabs"] = compatHtmlCommand(
+    (args, ctx) => `<div class="khem-tabs">${renderContent(args[0], ctx)}</div>`,
+  );
+  c["toast"] = compatHtmlCommand(
+    (args, ctx) => `<div class="khem-toast">${renderContent(args[0], ctx)}</div>`,
+  );
+  c["table"] = compatHtmlCommand(
+    (args, ctx) => `<table class="khem-table">${renderContent(args[0], ctx)}</table>`,
+  );
+  c["form"] = compatHtmlCommand(
+    (args, ctx) => `<form class="khem-form">${renderContent(args[0], ctx)}</form>`,
+  );
+  c["datepicker"] = compatHtmlCommand(
+    (args, ctx) =>
+      `<input type="date" class="khem-datepicker ${sub(args[0] ?? "", ctx)}">`,
+  );
+
   const tags = [
     "div",
     "span",
@@ -175,11 +196,17 @@ export function loadWebLib(env) {
     if (!el) return null;
     const event = sub(args[1], ctx);
     const block = args[2];
-    el.addEventListener(event, () => {
-      evaluate(block, ctx);
+    el.addEventListener(event, (ev) => {
+      const eCtx = { ...ctx, vars: Object.create(ctx.vars) };
+      eCtx.vars.event_type = ev.type;
+      eCtx.vars.event_target_id = ev.target?.id ?? "";
+      eCtx.vars.event_target_value = ev.target?.value ?? "";
+      evaluate(block, eCtx);
     });
     return null;
   };
+
+  c["on"] = (args, ctx) => c["dom_on"](args, ctx);
 
   c["script"] = compatHtmlCommand((args, ctx) => {
     if (args[0] === "src") return `<script src="${sub(args[1], ctx)}"></script>`;

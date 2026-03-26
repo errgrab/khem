@@ -4,7 +4,53 @@ import { loadStdLib } from "./plugins/stdlib.js";
 import { loadWebLib } from "./plugins/web.js";
 
 export function createEnvironment() {
-  const env = { vars: {}, cmds: {}, styles: [] };
+  const env = {
+    vars: {},
+    cmds: {},
+    styles: [],
+    stateKeys: new Set(),
+    persistKeys: new Set(),
+    derivations: [],
+    renderers: [],
+    notifyStateChange: () => {},
+  };
+
+  env.notifyStateChange = (changedKeys = []) => {
+    const changed = Array.isArray(changedKeys) ? changedKeys : [changedKeys];
+
+    for (const derivation of env.derivations) {
+      if (
+        changed.length > 0 &&
+        derivation.deps &&
+        !changed.some((key) => derivation.deps.has(key))
+      ) {
+        continue;
+      }
+
+      try {
+        const collector = new Set();
+        env.__activeCollector = collector;
+        env.vars[derivation.key] = derivation.compute();
+        derivation.deps = collector;
+      } catch (error) {
+        console.error(`Khem derive error for '${derivation.key}':`, error);
+      } finally {
+        env.__activeCollector = null;
+      }
+    }
+
+    env.renderers.forEach((renderer) => {
+      if (
+        changed.length > 0 &&
+        renderer.deps &&
+        renderer.deps.size > 0 &&
+        !changed.some((key) => renderer.deps.has(key))
+      ) {
+        return;
+      }
+      renderer();
+    });
+  };
 
   loadStdLib(env);
   loadWebLib(env);
@@ -22,6 +68,7 @@ export function run(code, customEnv = null) {
 
 export function updateState(newVars) {
   Object.assign(globalEnv.vars, newVars);
+  globalEnv.notifyStateChange(Object.keys(newVars));
 }
 
 export async function boot() {
@@ -55,8 +102,24 @@ export async function boot() {
       }
     }
 
-    try {
+    const startMarker = document.createComment("khem:start");
+    const endMarker = document.createComment("khem:end");
+    script.parentNode.insertBefore(startMarker, script);
+    script.parentNode.insertBefore(endMarker, script.nextSibling);
+
+    const renderScript = () => {
+      let cursor = startMarker.nextSibling;
+      while (cursor && cursor !== endMarker) {
+        const next = cursor.nextSibling;
+        cursor.remove();
+        cursor = next;
+      }
+
+      const collector = new Set();
+      globalEnv.__activeCollector = collector;
       const html = run(code, globalEnv);
+      renderScript.deps = collector;
+      globalEnv.__activeCollector = null;
 
       // Inject Styles (always update style tag as more may have been added)
       if (globalEnv.styles.length > 0) {
@@ -71,14 +134,21 @@ export async function boot() {
 
       if (html && html.trim()) {
         const range = document.createRange();
-        range.selectNode(script);
+        range.selectNode(endMarker);
         const fragment = range.createContextualFragment(html.trim());
-        script.parentNode.insertBefore(fragment, script);
+        endMarker.parentNode.insertBefore(fragment, endMarker);
       }
+    };
+
+    try {
+      renderScript();
     } catch (e) {
       console.error("Khem Runtime Error:", e);
     }
 
+    if (!globalEnv.renderers.includes(renderScript)) {
+      globalEnv.renderers.push(renderScript);
+    }
     script.dataset.khemProcessed = "true";
   }
 }

@@ -1,0 +1,57 @@
+state title "Khem Ops"
+state users 128
+state errors 3
+state cpu 42
+
+derive health {
+  if "$errors > 0" { text "Needs Attention" } else { text "Healthy" }
+}
+
+document "Khem Dashboard Showcase" {
+  style {
+    ".app" { padding 24px display flex flex-direction column gap 12px }
+    ".grid" { display grid grid-template-columns "repeat(3, minmax(0, 1fr))" gap 10px }
+    ".card" { background var(--s1) border 1px solid var(--border) padding 12px }
+    ".muted" { color var(--fg2) font-size 11px }
+    ".value" { font-size 18px }
+  }
+
+  div "app" {
+    h1 "" { text "$title" }
+    p "muted" { text "Reactive state + derive showcase" }
+
+    div "grid" {
+      div "card" {
+        p "muted" { text "Active Users" }
+        p "value" { text "$users" }
+      }
+      div "card" {
+        p "muted" { text "CPU %" }
+        p "value" { text "$cpu" }
+      }
+      div "card" {
+        p "muted" { text "Health" }
+        p "value" { text "$health" }
+      }
+    }
+
+    row {
+      button {
+        text "+ Users"
+        action {
+          set users expr "$users + 5"
+        }
+      }
+      button {
+        text "Toggle Errors"
+        action {
+          if "$errors > 0" {
+            set errors 0
+          } else {
+            set errors 3
+          }
+        }
+      }
+    }
+  }
+}

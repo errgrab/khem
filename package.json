@@ -7,7 +7,13 @@
     "example": "examples"
   },
   "scripts": {
-    "test": "node tests/node_test.js && node tests/parser_test.js"
+    "test": "node tests/node_test.js && node tests/parser_test.js",
+    "repl": "node bin/khem.js repl",
+    "watch": "node bin/khem.js watch",
+    "serve": "node bin/khem.js serve"
+  },
+  "bin": {
+    "khem": "./bin/khem.js"
   },
   "repository": {
     "type": "git",

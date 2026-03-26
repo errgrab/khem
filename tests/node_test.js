@@ -114,6 +114,155 @@ const tests = [
     `,
     expect: "Value", // Corrected expectation
   },
+  {
+    name: "Typed literals are preserved",
+    code: `
+      set i int 42
+      set f float 3.5
+      set t bool true
+      text "$i/$f/$t"
+    `,
+    expect: "42/3.5/true",
+  },
+  {
+    name: "Expr command arithmetic and boolean",
+    code: `
+      set a 2
+      set b 3
+      set sum expr "$a + $b * 2"
+      if "$sum == 8" { text "ok" } else { text "bad" }
+    `,
+    expect: "ok",
+  },
+  {
+    name: "Proc return value",
+    code: `
+      proc add2 { x } {
+        set result expr "$x + 2"
+        return $result
+      }
+      set out add2 5
+      text "$out"
+    `,
+    expect: "7",
+  },
+  {
+    name: "List and map literals",
+    code: `
+      set xs list a b c
+      set flag bool true
+      set obj map name "khem" stable $flag
+      text $xs
+      text "|"
+      text $obj
+    `,
+    expect: 'abc|{"name":"khem","stable":true}',
+  },
+  {
+    name: "Try catch and throw",
+    code: `
+      try {
+        throw "boom"
+      } catch {
+        text $error
+      }
+    `,
+    expect: "boom",
+  },
+  {
+    name: "Reactive state primitive",
+    code: `
+      state count 1
+      set count expr "$count + 1"
+      text "$count"
+    `,
+    expect: "2",
+  },
+  {
+    name: "Persist command is safe without browser storage",
+    code: `
+      state name "khem"
+      persist name
+      set name "khem2"
+      text "$name"
+    `,
+    expect: "khem2",
+  },
+  {
+    name: "Derive recomputes on state updates",
+    code: `
+      state price 10
+      state qty 3
+      derive total {
+        expr "$price * $qty"
+      }
+      set qty 4
+      text "$total"
+    `,
+    expect: "40",
+  },
+  {
+    name: "String and list helpers",
+    code: `
+      set raw " hello "
+      set clean trim "$raw"
+      set loud upper "$clean"
+      set chars split "$loud" "E"
+      set count length $chars
+      text "$clean|$loud|$count"
+    `,
+    expect: "hello|HELLO|2",
+  },
+  {
+    name: "Replace/map/filter/reduce helpers",
+    code: `
+      set words list "a-x" "bb-x" "ccc"
+      set replaced replace "a-x" "-x" ""
+      set sized map $words length
+      set filtered filter $sized gt 3
+      set sum reduce $filtered + 0
+      text "$replaced|$sum"
+    `,
+    expect: "a|4",
+  },
+  {
+    name: "Date and math helpers",
+    code: `
+      set y year-of "2026-03-26"
+      set m month-of "2026-03-26"
+      set d day-of "2026-03-26"
+      set dim days-in-month 2024 2
+      set p pow 2 5
+      set c clamp 11 0 7
+      text "$y/$m/$d/$dim/$p/$c"
+    `,
+    expect: "2026/3/26/29/32/7",
+  },
+  {
+    name: "Pattern matching",
+    code: `
+      set status "F"
+      match $status {
+        "F" { text "Full" }
+        "" { text "Empty" }
+        default { text "Other" }
+      }
+    `,
+    expect: "Full",
+  },
+  {
+    name: "Component library primitives",
+    code: `
+      modal { text "M" }
+      tabs { text "T" }
+      toast { text "Z" }
+      table { text "R" }
+      form { text "F" }
+      datepicker "x"
+    `,
+    expect:
+      '<div class="khem-modal"><div class="khem-modal-card">M</div></div><div class="khem-tabs">T</div><div class="khem-toast">Z</div><table class="khem-table">R</table><form class="khem-form">F</form><input type="date" class="khem-datepicker x">',
+  },
 ];
 
 let failed = 0;
