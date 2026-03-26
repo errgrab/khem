@@ -1,0 +1,165 @@
+# calculator.kh
+# Demonstrates: proc, match, expr, state, button grid, style composition
+
+state display "0"
+state lhs ""
+state op ""
+state fresh 1     # 1 = next keypress starts a new number
+
+proc press_digit { d } {
+  if "$fresh" {
+    set display $d
+    set fresh 0
+  } else {
+    set display join $display $d ""
+  }
+}
+
+proc press_op { o } {
+  set lhs   $display
+  set op    $o
+  set fresh 1
+}
+
+proc press_eq {} {
+  if "$op" {
+    set result match $op {
+      "+"  { expr "$lhs + $display" }
+      "-"  { expr "$lhs - $display" }
+      "×"  { expr "$lhs * $display" }
+      "÷"  { expr "$lhs / $display" }
+      default { emit $display }
+    }
+    set display $result
+    set lhs ""
+    set op  ""
+    set fresh 1
+  }
+}
+
+proc press_clear {} {
+  set display "0"
+  set lhs ""
+  set op  ""
+  set fresh 1
+}
+
+proc press_sign {} {
+  set display expr "$display * -1"
+}
+
+proc press_pct {} {
+  set display expr "$display / 100"
+}
+
+document "Calculator" {
+  style {
+    ".app" {
+      display flex
+      align-items center
+      justify-content center
+      min-height 100vh
+    }
+    ".calc" {
+      width 240px
+      border 1px solid var(--b2)
+      background var(--s1)
+    }
+    ".screen" {
+      padding "20px 16px 12px 16px"
+      text-align right
+      border-bottom 1px solid var(--border)
+    }
+    ".screen-op" {
+      font-size 9.5px
+      color var(--dim)
+      min-height 14px
+      letter-spacing 0.1em
+    }
+    ".screen-val" {
+      font-family var(--serif)
+      font-size 36px
+      color var(--fg)
+      overflow hidden
+      text-overflow ellipsis
+      white-space nowrap
+    }
+    ".grid" {
+      display grid
+      grid-template-columns "repeat(4, 1fr)"
+      gap 1px
+      background var(--border)
+    }
+    ".key" {
+      background var(--s2)
+      color var(--fg1)
+      padding "14px 0"
+      text-align center
+      cursor pointer
+      font-size 13px
+      border none
+      font-family var(--mono)
+      transition 0.1s
+    }
+    ".key:hover" {
+      background var(--s3)
+      color var(--fg)
+    }
+    ".key-fn" {
+      background var(--s0)
+      color var(--fg2)
+    }
+    ".key-op" {
+      background var(--s1)
+      color var(--acc)
+    }
+    ".key-eq" {
+      background var(--acc-dim)
+      color var(--acc)
+    }
+  }
+
+  div "app" {
+    div "calc" {
+      div "screen" {
+        p "screen-op" { text "$lhs $op" }
+        p "screen-val" { text "$display" }
+      }
+
+      div "grid" {
+        # Row 1 — functions
+        button { text "C";  class "key key-fn"; action { press_clear } }
+        button { text "+/-"; class "key key-fn"; action { press_sign } }
+        button { text "%";  class "key key-fn"; action { press_pct } }
+        button { text "÷";  class "key key-op"; action { press_op "÷" } }
+
+        # Row 2
+        button { text "7"; class "key"; action { press_digit "7" } }
+        button { text "8"; class "key"; action { press_digit "8" } }
+        button { text "9"; class "key"; action { press_digit "9" } }
+        button { text "×"; class "key key-op"; action { press_op "×" } }
+
+        # Row 3
+        button { text "4"; class "key"; action { press_digit "4" } }
+        button { text "5"; class "key"; action { press_digit "5" } }
+        button { text "6"; class "key"; action { press_digit "6" } }
+        button { text "−"; class "key key-op"; action { press_op "-" } }
+
+        # Row 4
+        button { text "1"; class "key"; action { press_digit "1" } }
+        button { text "2"; class "key"; action { press_digit "2" } }
+        button { text "3"; class "key"; action { press_digit "3" } }
+        button { text "+"; class "key key-op"; action { press_op "+" } }
+
+        # Row 5
+        button { text "0";  class "key"; action { press_digit "0" } }
+        button { text ".";  class "key"; action { press_digit "." } }
+        button { text "←";  class "key"; action {
+          set display slice $display 0 -1
+          if "$display" { set display "0" }
+        }}
+        button { text "="; class "key key-eq"; action { press_eq } }
+      }
+    }
+  }
+}

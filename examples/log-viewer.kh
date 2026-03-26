@@ -1,0 +1,181 @@
+# log-viewer.kh
+# Demonstrates: foreach, match, list literals, derive, filter, style composition
+# Data/dashboard example — a filterable log/event feed
+
+state level_filter "all"
+
+set logs list {
+  "info|Server started on port 4173"
+  "info|Environment: production"
+  "warn|Memory usage above 80%"
+  "error|Failed to connect to cache: ECONNREFUSED"
+  "info|Request: GET / 200 in 4ms"
+  "info|Request: GET /api/users 200 in 12ms"
+  "warn|Slow query detected: 340ms"
+  "error|Unhandled exception in worker thread"
+  "info|Request: POST /api/data 201 in 8ms"
+  "info|Graceful shutdown initiated"
+}
+
+derive visible_logs {
+  if "$level_filter == all" {
+    emit $logs
+  } else {
+    filter $logs starts_with_level
+  }
+}
+
+proc starts_with_level { entry } {
+  starts-with $entry $level_filter
+}
+
+proc level_color { lvl } {
+  match $lvl {
+    "info"  { text "var(--fg2)" }
+    "warn"  { text "var(--amber)" }
+    "error" { text "var(--red)" }
+    default { text "var(--fg3)" }
+  }
+}
+
+proc level_bg { lvl } {
+  match $lvl {
+    "warn"  { text "var(--s2)" }
+    "error" { text "background: var(--red-dim); border-left: 2px solid var(--red);" }
+    default { text "" }
+  }
+}
+
+document "Log Viewer" {
+  style {
+    ".app" {
+      max-width 720px
+      margin "32px auto"
+      display flex
+      flex-direction column
+      gap 16px
+    }
+    ".toolbar" {
+      display flex
+      align-items center
+      justify-content space-between
+      padding "0 0 12px 0"
+      border-bottom 1px solid var(--border)
+    }
+    ".title" {
+      font-family var(--serif)
+      font-size 20px
+    }
+    ".filter-row" {
+      display flex
+      gap 6px
+    }
+    ".chip" {
+      font-size 9px
+      padding "2px 8px"
+      border 1px solid var(--border)
+      color var(--fg3)
+      text-transform uppercase
+      letter-spacing 0.08em
+    }
+    ".chip-active" {
+      font-size 9px
+      padding "2px 8px"
+      border 1px solid var(--acc-dim)
+      color var(--acc)
+      text-transform uppercase
+      letter-spacing 0.08em
+    }
+    ".log-table" {
+      display flex
+      flex-direction column
+      border 1px solid var(--border)
+      background var(--s0)
+    }
+    ".log-row" {
+      display grid
+      grid-template-columns "42px 1fr"
+      gap 12px
+      align-items baseline
+      padding "6px 12px"
+      border-bottom 1px solid var(--border)
+      font-size 11px
+    }
+    ".log-row:last-child" {
+      border-bottom none
+    }
+    ".lvl" {
+      font-size 8.5px
+      text-transform uppercase
+      letter-spacing 0.12em
+      text-align right
+    }
+    ".msg" {
+      color var(--fg1)
+    }
+    ".stats" {
+      display flex
+      gap 16px
+      font-size 9.5px
+      color var(--fg3)
+    }
+    ".stat" {
+      text-transform uppercase
+      letter-spacing 0.09em
+    }
+    ".stat span" {
+      color var(--fg1)
+    }
+  }
+
+  div "app" {
+    div "toolbar" {
+      span "title" { text "Event Log" }
+      div "filter-row" {
+        button {
+          text "All"
+          class "chip-active"
+          action { set level_filter "all" }
+        }
+        button {
+          text "Info"
+          class "chip"
+          action { set level_filter "info" }
+        }
+        button {
+          text "Warn"
+          class "chip"
+          action { set level_filter "warn" }
+        }
+        button {
+          text "Error"
+          class "chip"
+          action { set level_filter "error" }
+        }
+      }
+    }
+
+    div "stats" {
+      p "stat" { text "Total: "; span "" { text length $logs } }
+      p "stat" { text "Shown: "; span "" { text length $visible_logs } }
+    }
+
+    div "log-table" {
+      foreach entry $visible_logs {
+        set parts split $entry "|"
+        set lvl   find $parts 0
+        set msg   find $parts 1
+        set col   level_color $lvl
+
+        div "log-row" {
+          span "lvl" {
+            style { color $col } {
+              text "$lvl"
+            }
+          }
+          span "msg" { text "$msg" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,225 @@
+# stdlib-tour.kh
+# Demonstrates every built-in command with visible, runnable output.
+# Use this as a living reference / cheat-sheet for the Khem stdlib.
+
+proc section { title } {
+  h2 "section-title" { text $title }
+}
+
+proc row2 { label value } {
+  div "demo-row" {
+    span "demo-label" { text $label }
+    span "demo-value" { text $value }
+  }
+}
+
+document "Khem Stdlib Tour" {
+  style {
+    ".page" {
+      max-width 680px
+      margin "32px auto"
+      display flex
+      flex-direction column
+      gap 32px
+    }
+    ".section-title" {
+      font-family var(--serif)
+      font-size 18px
+      color var(--acc)
+      padding-bottom 6px
+      border-bottom 1px solid var(--border)
+      margin-bottom 10px
+    }
+    ".group" {
+      display flex
+      flex-direction column
+      gap 2px
+    }
+    ".demo-row" {
+      display grid
+      grid-template-columns "200px 1fr"
+      padding "5px 10px"
+      border-bottom 1px solid var(--border)
+      font-size 11px
+    }
+    ".demo-label" {
+      color var(--fg3)
+      font-size 10px
+      padding-top 1px
+    }
+    ".demo-value" {
+      color var(--fg1)
+    }
+    "code" {
+      color var(--acc)
+      font-size 10px
+    }
+  }
+
+  div "page" {
+
+    # ── Variables ───────────────────────────────────────────────────
+    section "Variables & Types"
+    div "group" {
+      set name "khem"
+      set version 2
+      set flag bool true
+      set ratio float 3.14
+      set n int "42"
+      row2 "set name"    $name
+      row2 "bool true"   $flag
+      row2 "float 3.14"  $ratio
+      row2 "int \"42\""  $n
+    }
+
+    # ── Arithmetic via expr ─────────────────────────────────────────
+    section "Expressions (expr)"
+    div "group" {
+      set a 7
+      set b 3
+      row2 "expr \"$a + $b\""     expr "$a + $b"
+      row2 "expr \"$a * $b\""     expr "$a * $b"
+      row2 "expr \"$a % $b\""     expr "$a % $b"
+      row2 "expr \"$a == 7\""     expr "$a == 7"
+      row2 "expr \"$a > $b\""     expr "$a > $b"
+      row2 "expr \"($a+1) * $b\"" expr "($a + 1) * $b"
+    }
+
+    # ── Math helpers ────────────────────────────────────────────────
+    section "Math"
+    div "group" {
+      row2 "abs -9"         abs -9
+      row2 "floor 4.9"      floor 4.9
+      row2 "ceil 4.1"       ceil 4.1
+      row2 "round 4.5"      round 4.5
+      row2 "mod 17 5"       mod 17 5
+      row2 "clamp 15 0 10"  clamp 15 0 10
+      row2 "pow 2 8"        pow 2 8
+      row2 "min 3 7 1 9"    min 3 7 1 9
+      row2 "max 3 7 1 9"    max 3 7 1 9
+    }
+
+    # ── String helpers ──────────────────────────────────────────────
+    section "Strings"
+    div "group" {
+      set s "  Hello, World!  "
+      row2 "trim"           trim $s
+      row2 "upper"          upper $s
+      row2 "lower"          lower $s
+      row2 "length"         length $s
+      row2 "slice 2 7"      slice $s 2 7
+      row2 "replace , ;"    replace $s "," ";"
+      row2 "contains World" contains $s "World"
+      row2 "starts-with \" \"" starts-with $s " "
+      row2 "ends-with \"!  \"" ends-with $s "!"
+    }
+
+    # ── List helpers ────────────────────────────────────────────────
+    section "Lists"
+    div "group" {
+      set xs list 4 2 8 1 5
+      row2 "list 4 2 8 1 5"   $xs
+      row2 "length"            length $xs
+      row2 "push 99"           push $xs 99
+      row2 "pop"               pop $xs
+      row2 "sort"              sort $xs
+      row2 "find 8"            find $xs 8
+      row2 "slice 1 3"         slice $xs 1 3
+      row2 "contains 8"        contains $xs 8
+      row2 "filter gt 4"       filter $xs gt 4
+      row2 "map upper"         map list "foo" "bar" upper
+      row2 "reduce +"          reduce $xs +
+    }
+
+    # ── String ↔ List ───────────────────────────────────────────────
+    section "Split & Join"
+    div "group" {
+      set csv "alpha,beta,gamma"
+      set parts split $csv ","
+      row2 "split \",\""   $parts
+      row2 "join \"-\""    join $parts "-"
+    }
+
+    # ── Date helpers ────────────────────────────────────────────────
+    section "Dates"
+    div "group" {
+      set d "2026-03-26"
+      row2 "today"          today
+      row2 "year-of"        year-of $d
+      row2 "month-of"       month-of $d
+      row2 "day-of"         day-of $d
+      row2 "days-in-month 2 2024" days-in-month 2024 2
+      row2 "format-date"    format-date $d "pt-PT"
+    }
+
+    # ── Control flow ────────────────────────────────────────────────
+    section "Control Flow"
+    div "group" {
+      set x 5
+      row2 "if true branch" if "1 == 1" { text "yes" } else { text "no" }
+      row2 "if false branch" if "1 == 2" { text "yes" } else { text "no" }
+      row2 "not false"       not false
+      row2 "eq 5 5"          eq 5 5
+      row2 "gt 9 5"          gt 9 5
+      row2 "lte 3 3"         lte 3 3
+
+      set loop_out ""
+      for i 1 4 { set loop_out join $loop_out "$i " "" }
+      row2 "for 1..4"  $loop_out
+
+      set each_out ""
+      foreach w "foo bar baz" { set each_out join $each_out "[$w]" "" }
+      row2 "foreach"   $each_out
+    }
+
+    # ── match ───────────────────────────────────────────────────────
+    section "Pattern Matching"
+    div "group" {
+      proc demo_match { v } {
+        match $v {
+          "a" { text "alpha" }
+          "b" { text "beta" }
+          default { text "other" }
+        }
+      }
+      row2 "match \"a\"" demo_match "a"
+      row2 "match \"b\"" demo_match "b"
+      row2 "match \"z\"" demo_match "z"
+    }
+
+    # ── proc & return ───────────────────────────────────────────────
+    section "Procedures & Return"
+    div "group" {
+      proc greet { name } {
+        return join "Hello, " $name "!"
+      }
+      proc square { n } {
+        return expr "$n * $n"
+      }
+      row2 "greet \"Erik\"" greet "Erik"
+      row2 "square 7"       square 7
+    }
+
+    # ── try/catch/throw ─────────────────────────────────────────────
+    section "Error Handling"
+    div "group" {
+      try {
+        throw "something went wrong"
+      } catch {
+        row2 "caught error" $error
+      }
+    }
+
+    # ── derive ──────────────────────────────────────────────────────
+    section "Reactive Derive"
+    div "group" {
+      state price 50
+      state qty   3
+      derive total { expr "$price * $qty" }
+      row2 "price" $price
+      row2 "qty"   $qty
+      row2 "derived total" $total
+    }
+
+  }
+}

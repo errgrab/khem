@@ -1,0 +1,124 @@
+# counter.kh
+# Demonstrates: state, derive, match, reactive button actions, style blocks
+
+state count 0
+state step 1
+
+derive label {
+  match $count {
+    0    { text "zero" }
+    default {
+      if "$count > 0" { text "positive" } else { text "negative" }
+    }
+  }
+}
+
+derive badge_color {
+  if "$count > 0" {
+    text "var(--green)"
+  } else {
+    if "$count < 0" { text "var(--red)" } else { text "var(--dim)" }
+  }
+}
+
+document "Counter" {
+  style {
+    ".app" {
+      display flex
+      flex-direction column
+      align-items center
+      justify-content center
+      min-height 100vh
+      gap 24px
+    }
+    ".display" {
+      font-size 72px
+      font-family var(--serif)
+      color var(--fg)
+      min-width 160px
+      text-align center
+      border-bottom 1px solid var(--border)
+      padding-bottom 8px
+    }
+    ".badge" {
+      font-size 9.5px
+      text-transform uppercase
+      letter-spacing 0.18em
+      padding "2px 10px"
+      border 1px solid var(--b2)
+    }
+    ".controls" {
+      display flex
+      gap 12px
+      align-items center
+    }
+    ".btn-large" {
+      font-size 20px
+      padding "6px 22px"
+      line-height 1
+    }
+    ".step-row" {
+      display flex
+      gap 6px
+      align-items center
+    }
+    ".muted" {
+      color var(--fg3)
+      font-size 10px
+      text-transform uppercase
+      letter-spacing 0.09em
+    }
+    ".step-btn" {
+      font-size 9px
+      padding "3px 8px"
+      border 1px solid var(--border)
+    }
+    ".step-btn-active" {
+      font-size 9px
+      padding "3px 8px"
+      border 1px solid var(--acc)
+      color var(--acc)
+    }
+  }
+
+  div "app" {
+    p "display" { text "$count" }
+    span "badge" { text "$label" }
+
+    div "controls" {
+      button {
+        text "−"
+        class "btn-large"
+        action { set count expr "$count - $step" }
+      }
+      button {
+        text "Reset"
+        action { set count 0 }
+      }
+      button {
+        text "+"
+        class "btn-large"
+        action { set count expr "$count + $step" }
+      }
+    }
+
+    div "step-row" {
+      p "muted" { text "Step:" }
+      button {
+        text "1"
+        class "step-btn-active"
+        action { set step 1 }
+      }
+      button {
+        text "5"
+        class "step-btn"
+        action { set step 5 }
+      }
+      button {
+        text "10"
+        class "step-btn"
+        action { set step 10 }
+      }
+    }
+  }
+}
