@@ -1,0 +1,92 @@
+# fizzbuzz.kh - Classic FizzBuzz
+title "FizzBuzz"
+state n 1
+
+page "home" {
+  style {
+    ".app" {
+      padding 40px;
+      max-width 500px;
+      margin 0 auto;
+    }
+    ".title" {
+      font-family var(--serif);
+      font-size 32px;
+      color var(--fg);
+      margin-bottom 24px;
+    }
+    ".current" {
+      font-size 9px;
+      text-transform uppercase;
+      letter-spacing 0.12em;
+      color var(--fg3);
+      margin-bottom 16px;
+    }
+    ".result" {
+      font-size 72px;
+      font-family var(--serif);
+      color var(--fg);
+      padding 24px 0;
+      border-bottom 1px solid var(--border);
+      margin-bottom 24px;
+      text-align center;
+    }
+    ".controls" {
+      display flex;
+      gap 12px;
+      justify-content center;
+      margin-bottom 32px;
+    }
+    ".grid" {
+      display grid;
+      grid-template-columns repeat(5, 1fr);
+      gap 4px;
+    }
+    ".cell" {
+      padding 8px 4px;
+      text-align center;
+      font-size 11px;
+      border 1px solid var(--border);
+      background var(--s1);
+    }
+    ".fizz" {
+      color var(--green);
+    }
+    ".buzz" {
+      color var(--acc);
+    }
+    ".fizzbuzz" {
+      color var(--amber);
+      font-weight 500;
+    }
+  }
+
+  div "app" {
+    h1 "title" { text "FizzBuzz" }
+    p "current" { text [concat "Number: " $n] }
+    
+    div "result" {
+      text [concat " " $n " "]
+    }
+
+    div "controls" {
+      button "" { text "Prev" } { set n [expr $n - 1] }
+      button "" { text "Next" } { set n [expr $n + 1] }
+    }
+
+    div "grid" {
+      div "cell" { text "1" }
+      div "cell" { text "2" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "4" }
+      div "cell buzz" { text "Buzz" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "7" }
+      div "cell" { text "8" }
+      div "cell fizz" { text "Fizz" }
+      div "cell buzz" { text "Buzz" }
+    }
+  }
+}
+
+route "#/" "home"

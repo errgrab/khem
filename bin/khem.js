@@ -4,7 +4,7 @@ import path from "node:path";
 import http from "node:http";
 import readline from "node:readline";
 import { spawn } from "node:child_process";
-import { run, createEnvironment } from "../src/index.js";
+import { run, createEnvironment, runForWeb, processScriptTags } from "../src/index.js";
 import { ParseError } from "../src/core/parser.js";
 
 const [, , cmd, ...args] = process.argv;
@@ -17,55 +17,27 @@ const printError = (error, file = "<stdin>") => {
   console.error(error?.stack || String(error));
 };
 
-const collectModuleSources = (entryPath, visited = new Set(), moduleSources = new Map()) => {
-  const absPath = path.resolve(entryPath);
-  if (visited.has(absPath)) return moduleSources;
-  visited.add(absPath);
-  const code = fs.readFileSync(absPath, "utf8");
-  moduleSources.set(absPath, code);
-
-  const importPattern = /^\s*import\s+"([^"]+)"\s*$/gm;
-  let match = importPattern.exec(code);
-  while (match) {
-    const childPath = path.resolve(path.dirname(absPath), match[1]);
-    collectModuleSources(childPath, visited, moduleSources);
-    match = importPattern.exec(code);
-  }
-
-  return moduleSources;
+const isWebFile = (code) => {
+  return /^\s*(page|route|state|title)\s/m.test(code) || 
+         code.includes("<script type=\"text/khem\">");
 };
 
-const compileFile = (filePath) => {
+const compileFile = (filePath, forceWeb = false) => {
   const absPath = path.resolve(filePath);
-  const moduleSources = collectModuleSources(absPath);
-  const env = createEnvironment();
-  env.entryModule = absPath;
-  env.resolveModule = (spec, fromModule) =>
-    path.resolve(path.dirname(fromModule || absPath), spec);
-  env.readModule = (moduleId) => moduleSources.get(path.resolve(moduleId));
-  return run(moduleSources.get(absPath), env);
-};
-
-const runTestSuite = () => {
-  const nodeSuite = spawn(process.execPath, ["tests/node_test.js"], {
-    stdio: "inherit",
-    cwd: process.cwd(),
-  });
-
-  nodeSuite.on("exit", (code) => {
-    if (code !== 0) {
-      process.exit(code ?? 1);
-      return;
-    }
-
-    const parserSuite = spawn(process.execPath, ["tests/parser_test.js"], {
-      stdio: "inherit",
-      cwd: process.cwd(),
-    });
-    parserSuite.on("exit", (parserCode) => {
-      process.exit(parserCode ?? 1);
-    });
-  });
+  const code = fs.readFileSync(absPath, "utf8");
+  const baseDir = path.dirname(absPath);
+  
+  // Check if it's a web file or forced web mode
+  if (forceWeb || isWebFile(code)) {
+    return runForWeb(code, undefined, baseDir);
+  }
+  
+  // Check if it's an HTML file with khem script tags
+  if (filePath.endsWith(".html") || code.includes("<script type=\"text/khem\">")) {
+    return processScriptTags(code);
+  }
+  
+  return run(code);
 };
 
 const startRepl = () => {
@@ -97,14 +69,15 @@ const startRepl = () => {
   });
 };
 
-const watchFile = (filePath) => {
+const watchFile = (filePath, forceWeb = false) => {
   const absPath = path.resolve(filePath);
-  const outPath = absPath.replace(/\.kh$/i, ".html");
+  const ext = forceWeb || isWebFile(fs.readFileSync(absPath, "utf8")) ? ".html" : ".txt";
+  const outPath = absPath.replace(/\.[^.]+$/, ext);
 
   const build = () => {
     try {
-      const html = compileFile(absPath);
-      fs.writeFileSync(outPath, html, "utf8");
+      const output = compileFile(absPath, forceWeb);
+      fs.writeFileSync(outPath, output, "utf8");
       console.log(`[khem] rebuilt ${path.basename(outPath)} at ${new Date().toISOString()}`);
     } catch (error) {
       printError(error, absPath);
@@ -112,22 +85,20 @@ const watchFile = (filePath) => {
   };
 
   build();
-
-  let timer = null;
   fs.watch(absPath, () => {
-    clearTimeout(timer);
-    timer = setTimeout(build, 40);
+    build();
   });
 
   console.log(`[khem] watching ${absPath}`);
 };
 
-const serveFile = (filePath, port = 4173) => {
+const serveFile = (filePath, port = 4173, forceWeb = false) => {
   const absPath = path.resolve(filePath);
   const clients = new Set();
+
   const sendReload = () => {
     for (const res of clients) {
-      res.write(`data: reload\\n\\n`);
+      res.write("data: reload\n\n");
     }
   };
 
@@ -140,21 +111,27 @@ const serveFile = (filePath, port = 4173) => {
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       });
-      res.write("\\n");
+      res.write("\n");
       clients.add(res);
       req.on("close", () => clients.delete(res));
       return;
     }
 
     try {
-      let html = compileFile(absPath);
-      const reloadScript =
-        "<script>const es=new EventSource('/__khem_events');es.onmessage=(e)=>{if(e.data==='reload')location.reload();};</script>";
-      html = html.includes("</body>")
-        ? html.replace("</body>", `${reloadScript}</body>`)
-        : `${html}${reloadScript}`;
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(html);
+      let output = compileFile(absPath, forceWeb);
+      
+      // Inject live reload script
+      const reloadScript = `<script>const es=new EventSource('/__khem_events');es.onmessage=(e)=>{if(e.data==='reload')location.reload();};</script>`;
+      
+      if (output.includes("</body>")) {
+        output = output.replace("</body>", `${reloadScript}</body>`);
+      } else {
+        output += reloadScript;
+      }
+
+      const contentType = output.startsWith("<!DOCTYPE") ? "text/html" : "text/plain";
+      res.writeHead(200, { "Content-Type": `${contentType}; charset=utf-8` });
+      res.end(output);
     } catch (error) {
       res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
       res.end(String(error?.stack || error));
@@ -166,6 +143,29 @@ const serveFile = (filePath, port = 4173) => {
   });
 };
 
+const runTestSuite = () => {
+  const nodeSuite = spawn(process.execPath, ["tests/node_test.js"], {
+    stdio: "inherit",
+    cwd: process.cwd(),
+  });
+
+  nodeSuite.on("exit", (code) => {
+    if (code !== 0) {
+      process.exit(code ?? 1);
+      return;
+    }
+
+    const parserSuite = spawn(process.execPath, ["tests/parser_test.js"], {
+      stdio: "inherit",
+      cwd: process.cwd(),
+    });
+    parserSuite.on("exit", (parserCode) => {
+      process.exit(parserCode ?? 1);
+    });
+  });
+};
+
+// CLI Commands
 if (cmd === "test") {
   runTestSuite();
 } else if (cmd === "repl") {
@@ -176,17 +176,19 @@ if (cmd === "test") {
     console.error("Usage: khem watch <file.kh>");
     process.exit(1);
   }
-  watchFile(target);
+  const forceWeb = args.includes("--web");
+  watchFile(target, forceWeb);
 } else if (cmd === "build") {
   const target = args[0];
   if (!target) {
-    console.error("Usage: khem build <file.kh>");
+    console.error("Usage: khem build <file.kh> [--web]");
     process.exit(1);
   }
 
   try {
-    const html = compileFile(target);
-    process.stdout.write(html);
+    const forceWeb = args.includes("--web");
+    const output = compileFile(target, forceWeb);
+    process.stdout.write(output);
   } catch (error) {
     printError(error, target);
     process.exit(1);
@@ -198,12 +200,30 @@ if (cmd === "test") {
     console.error("Usage: khem serve <file.kh> [port]");
     process.exit(1);
   }
-  serveFile(target, Number.isFinite(portArg) ? portArg : 4173);
+  const forceWeb = args.includes("--web");
+  serveFile(target, Number.isFinite(portArg) ? portArg : 4173, forceWeb);
+} else if (cmd === "run") {
+  // Quick run a file
+  const target = args[0];
+  if (!target) {
+    console.error("Usage: khem run <file.kh>");
+    process.exit(1);
+  }
+  try {
+    const code = fs.readFileSync(target, "utf8");
+    const output = run(code);
+    if (output.trim()) console.log(output);
+  } catch (error) {
+    printError(error, target);
+    process.exit(1);
+  }
 } else {
   console.log(`Usage:
-  khem build <file.kh>
-  khem watch <file.kh>
-  khem serve <file.kh> [port]
-  khem repl
-  khem test`);
+  khem run <file.kh>        Run a Khem script
+  khem build <file.kh>      Build to HTML (auto-detect web mode)
+  khem build <file.kh> --web  Force web mode
+  khem watch <file.kh>      Watch and rebuild
+  khem serve <file.kh> [port] Serve with live reload
+  khem repl                 Interactive REPL
+  khem test                 Run tests`);
 }

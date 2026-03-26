@@ -1,0 +1,14 @@
+# test_match.kh - Debug match command
+proc testMatch { op } {
+  if [eq $op "+"] { puts "Matched + directly" }
+  if [eq $op "-"] { puts "Matched - directly" }
+  match $op {
+    "+" { puts "Matched + in match" }
+    "-" { puts "Matched - in match" }
+    default { puts "No match in match" }
+  }
+}
+
+testMatch +
+testMatch -
+testMatch x

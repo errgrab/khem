@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Counter</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>:root {
+  --bg: #0a0a0a; --s0: #101010; --s1: #161616; --s2: #1e1e1e; --s3: #262626;
+  --border: #272727; --b2: #333333;
+  --fg: #d4d0c8; --fg1: #aaaaaa; --fg2: #888888; --fg3: #555555; --dim: #484848;
+  --acc: #c8a84b; --acc-dim: #7a6628;
+  --green: #6b9e78; --red: #a86b6b; --blue: #7a8fa8; --amber: #d4924a;
+  --mono: 'DM Mono', monospace; --serif: 'Instrument Serif', serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 12px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--serif); font-weight: normal; }
+p { color: var(--fg1); }
+a { color: var(--acc); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { background: transparent; border: 1px solid var(--border); color: var(--fg2); padding: 4px 12px; cursor: pointer; font-family: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; transition: all 0.15s; }
+button:hover { border-color: var(--b2); color: var(--fg); }
+input { background: var(--s1); border: 1px solid var(--border); color: var(--fg); padding: 8px 10px; font-family: inherit; font-size: 12px; outline: none; }
+input:focus { border-color: var(--acc); }
+</style>
+</head>
+<body>
+  <div id="app"><div class="app"><p class="display">0</p><span class="badge">count</span><div class="controls"><button class="btn" onclick="khemAct('act_1')">-</button><button onclick="khemAct('act_2')">Reset</button><button class="btn" onclick="khemAct('act_3')">+</button></div></div></div>
+  <script>
+    var S = {"count":"0"};
+    var P = {"home":"style {\n    \".app\" {\n      display flex;\n      flex-direction column;\n      align-items center;\n      justify-content center;\n      min-height 100vh;\n      gap 24px;\n    }\n    \".display\" {\n      font-size 72px;\n      font-family var(--serif);\n      color var(--fg);\n      min-width 160px;\n      text-align center;\n      border-bottom 1px solid var(--border);\n      padding-bottom 8px;\n    }\n    \".badge\" {\n      font-size 9.5px;\n      text-transform uppercase;\n      letter-spacing 0.18em;\n      color var(--fg3);\n    }\n    \".controls\" {\n      display flex;\n      gap 12px;\n      align-items center;\n    }\n    \".btn\" {\n      font-size 24px;\n      padding 8px 24px;\n      min-width 48px;\n    }\n  }\n\n  div \"app\" {\n    p \"display\" { text $count }\n    span \"badge\" { text \"count\" }\n\n    div \"controls\" {\n      button \"btn\" { text \"-\" } { set count [expr $count - 1] }\n      button \"\" { text \"Reset\" } { set count 0 }\n      button \"btn\" { text \"+\" } { set count [expr $count + 1] }\n    }\n  }"};
+    var R = {"#/":"home"};
+    var A = {"act_1":"set count [expr 0 - 1]","act_2":"set count 0","act_3":"set count [expr 0 + 1]"};
+    
+    // Simple $var substitution
+    function sub(s) {
+      return s.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, function(m, k) {
+        return S[k] !== undefined ? S[k] : m;
+      });
+    }
+    
+    // Render page with current state
+    function render() {
+      var hash = location.hash || "#/";
+      var page = R[hash];
+      if (!page || !P[page]) return;
+      
+      // Get template and substitute $vars
+      var tmpl = P[page];
+      document.getElementById("app").innerHTML = sub(tmpl);
+    }
+    
+    // Execute action
+    function khemAct(id) {
+      var act = A[id];
+      if (!act) return;
+      
+      // Parse: set name [expr ...] or set name value
+      var m = act.match(/^set\s+(\S+)\s+(.+)$/);
+      if (!m) return;
+      
+      var name = m[1];
+      var val = m[2].trim();
+      
+      // Handle [expr $x op y]
+      var em = val.match(/^\[expr\s+(.+)\]$/);
+      if (em) {
+        // Substitute $vars then eval
+        var expr = em[1].replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, function(_, k) {
+          return S[k] || "0";
+        });
+        try { S[name] = String(eval(expr)); } catch(e) { S[name] = "0"; }
+      } else {
+        // Plain value (remove quotes)
+        val = val.replace(/^"|"$/g, "");
+        S[name] = sub(val);
+      }
+      
+      render();
+    }
+    
+    window.khemAct = khemAct;
+    window.addEventListener("hashchange", render);
+    render();
+  </script>
+</body>
+</html>

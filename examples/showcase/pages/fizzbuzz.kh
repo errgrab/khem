@@ -1,0 +1,87 @@
+# fizzbuzz.kh - FizzBuzz page
+
+page "fizzbuzz" {
+  style {
+    ".page" {
+      padding 40px
+      max-width 600px
+      margin 0 auto
+    }
+    ".back" {
+      display inline-block
+      color var(--fg3)
+      font-size 9px
+      text-transform uppercase
+      letter-spacing 0.08em
+      margin-bottom 24px
+    }
+    ".back:hover" { color var(--fg) }
+    ".title" {
+      font-family var(--serif)
+      font-size 32px
+      margin-bottom 24px
+    }
+    ".list" {
+      display flex
+      flex-wrap wrap
+      gap 8px
+    }
+    ".fizz" {
+      color var(--green)
+      font-size 11px
+    }
+    ".buzz" {
+      color var(--acc)
+      font-size 11px
+    }
+    ".fizzbuzz" {
+      color var(--amber)
+      font-size 11px
+      font-weight 500
+    }
+    ".num" {
+      color var(--fg2)
+      font-size 11px
+    }
+  }
+
+  div "page" {
+    a "#/" "back" { text "← Back" }
+    h1 "title" { text "FizzBuzz (1-30)" }
+    
+    div "list" {
+      text " 1 "
+      text " 2 "
+      text [concat " " [string toupper "fizz"] " "]
+      text " 4 "
+      text [concat " " [string toupper "buzz"] " "]
+      text [concat " " [string toupper "fizz"] " "]
+      text " 7 "
+      text " 8 "
+      text [concat " " [string toupper "fizz"] " "]
+      text [concat " " [string toupper "buzz"] " "]
+      text " 11 "
+      text [concat " " [string toupper "fizz"] " "]
+      text " 13 "
+      text " 14 "
+      text [concat " " [string toupper "fizzbuzz"] " "]
+      text " 16 "
+      text " 17 "
+      text [concat " " [string toupper "fizz"] " "]
+      text " 19 "
+      text [concat " " [string toupper "buzz"] " "]
+      text [concat " " [string toupper "fizz"] " "]
+      text " 22 "
+      text " 23 "
+      text [concat " " [string toupper "fizz"] " "]
+      text [concat " " [string toupper "buzz"] " "]
+      text " 26 "
+      text [concat " " [string toupper "fizz"] " "]
+      text " 28 "
+      text " 29 "
+      text [concat " " [string toupper "fizzbuzz"] " "]
+    }
+  }
+}
+
+route "#/fizzbuzz" "fizzbuzz"

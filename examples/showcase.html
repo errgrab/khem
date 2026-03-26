@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khem Showcase</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>:root {
+  --bg: #0a0a0a;
+  --s0: #101010;
+  --s1: #161616;
+  --s2: #1e1e1e;
+  --s3: #262626;
+  --border: #272727;
+  --b2: #333333;
+  --fg: #d4d0c8;
+  --fg1: #aaaaaa;
+  --fg2: #888888;
+  --fg3: #555555;
+  --dim: #484848;
+  --acc: #c8a84b;
+  --acc-dim: #7a6628;
+  --green: #6b9e78;
+  --green-dim: #2a4a33;
+  --red: #a86b6b;
+  --red-dim: #4a2222;
+  --blue: #7a8fa8;
+  --blue-dim: #2a3a4a;
+  --amber: #d4924a;
+  --mono: 'DM Mono', 'Fira Mono', ui-monospace, monospace;
+  --serif: 'Instrument Serif', Georgia, serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--fg);
+}
+p { color: var(--fg1); }
+a { color: var(--acc); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { color: var(--acc); font-size: 10.5px; }
+button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg2);
+  padding: 6px 16px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: all 0.15s;
+}
+button:hover { border-color: var(--b2); color: var(--fg); }
+input, textarea, select {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: all 0.15s;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--acc); }
+::placeholder { color: var(--fg3); }
+
+</style>
+</head>
+<body>
+  <div id="app"><div class="app"><h1 class="title">Khem Showcase</h1><p class="subtitle">Demos and examples</p><div class="nav"><a href="#/counter" class="link"><div><p class="link-title">Counter</p><p class="link-desc">Simple reactive counter</p></div></a><a href="#/fizzbuzz" class="link"><div><p class="link-title">FizzBuzz</p><p class="link-desc">Classic FizzBuzz in Khem</p></div></a><a href="#/lists" class="link"><div><p class="link-title">Lists</p><p class="link-desc">List operations demo</p></div></a><a href="#/strings" class="link"><div><p class="link-title">Strings</p><p class="link-desc">String manipulation</p></div></a></div></div></div>
+  <script>
+    window.Khem = {
+      state: {"counter_val":"0"},
+      routes: {"#/":"home","#/counter":"counter","#/fizzbuzz":"fizzbuzz","#/lists":"lists","#/strings":"strings"},
+      pages: {"home":"style {\n    \".app\" {\n      padding 40px\n      max-width 600px\n      margin 0 auto\n    }\n    \".title\" {\n      font-family var(--serif)\n      font-size 32px\n      color var(--fg)\n      margin-bottom 8px\n    }\n    \".subtitle\" {\n      font-size 9.5px\n      text-transform uppercase\n      letter-spacing 0.18em\n      color var(--fg3)\n      margin-bottom 32px\n    }\n    \".nav\" {\n      display flex\n      flex-direction column\n      gap 8px\n    }\n    \".link\" {\n      display block\n      padding 12px 16px\n      border 1px solid var(--border)\n      background var(--s1)\n      text-decoration none\n      color var(--fg1)\n      transition all 0.15s\n    }\n    \".link:hover\" {\n      border-color var(--b2)\n      color var(--fg)\n    }\n    \".link-title\" {\n      color var(--acc)\n      font-size 10px\n      text-transform uppercase\n      letter-spacing 0.08em\n      margin-bottom 4px\n    }\n    \".link-desc\" {\n      font-size 12px\n      color var(--fg2)\n    }\n  }\n\n  div \"app\" {\n    h1 \"title\" { text \"Khem Showcase\" }\n    p \"subtitle\" { text \"Demos and examples\" }\n\n    div \"nav\" {\n      a \"#/counter\" \"link\" {\n        div \"\" {\n          p \"link-title\" { text \"Counter\" }\n          p \"link-desc\" { text \"Simple reactive counter\" }\n        }\n      }\n      a \"#/fizzbuzz\" \"link\" {\n        div \"\" {\n          p \"link-title\" { text \"FizzBuzz\" }\n          p \"link-desc\" { text \"Classic FizzBuzz in Khem\" }\n        }\n      }\n      a \"#/lists\" \"link\" {\n        div \"\" {\n          p \"link-title\" { text \"Lists\" }\n          p \"link-desc\" { text \"List operations demo\" }\n        }\n      }\n      a \"#/strings\" \"link\" {\n        div \"\" {\n          p \"link-title\" { text \"Strings\" }\n          p \"link-desc\" { text \"String manipulation\" }\n        }\n      }\n    }\n  }","counter":"style {\n    \".page\" {\n      padding 40px;\n      max-width 600px;\n      margin 0 auto;\n    }\n    \".back\" {\n      display inline-block;\n      color var(--fg3);\n      font-size 9px;\n      text-transform uppercase;\n      letter-spacing 0.08em;\n      margin-bottom 24px;\n    }\n    \".back:hover\" { color var(--fg) }\n    \".title\" {\n      font-family var(--serif);\n      font-size 32px;\n      margin-bottom 24px;\n    }\n    \".display\" {\n      font-size 72px;\n      font-family var(--serif);\n      color var(--fg);\n      text-align center;\n      padding 24px 0;\n      border-bottom 1px solid var(--border);\n      margin-bottom 24px;\n    }\n    \".controls\" {\n      display flex;\n      gap 12px;\n      justify-content center;\n    }\n    \".btn\" {\n      font-size 24px;\n      padding 8px 24px;\n    }\n  }\n\n  div \"page\" {\n    a \"#/\" \"back\" { text \"← Back\" }\n    h1 \"title\" { text \"Counter\" }\n    p \"display\" { text 0 }\n    div \"controls\" {\n      button \"btn\" { text \"-\" } { set counter_val [expr 0 - 1] }\n      button \"\" { text \"Reset\" } { set counter_val 0 }\n      button \"btn\" { text \"+\" } { set counter_val [expr 0 + 1] }\n    }\n  }","fizzbuzz":"style {\n    \".page\" {\n      padding 40px\n      max-width 600px\n      margin 0 auto\n    }\n    \".back\" {\n      display inline-block\n      color var(--fg3)\n      font-size 9px\n      text-transform uppercase\n      letter-spacing 0.08em\n      margin-bottom 24px\n    }\n    \".back:hover\" { color var(--fg) }\n    \".title\" {\n      font-family var(--serif)\n      font-size 32px\n      margin-bottom 24px\n    }\n    \".list\" {\n      display flex\n      flex-wrap wrap\n      gap 8px\n    }\n    \".fizz\" {\n      color var(--green)\n      font-size 11px\n    }\n    \".buzz\" {\n      color var(--acc)\n      font-size 11px\n    }\n    \".fizzbuzz\" {\n      color var(--amber)\n      font-size 11px\n      font-weight 500\n    }\n    \".num\" {\n      color var(--fg2)\n      font-size 11px\n    }\n  }\n\n  div \"page\" {\n    a \"#/\" \"back\" { text \"← Back\" }\n    h1 \"title\" { text \"FizzBuzz (1-30)\" }\n    \n    div \"list\" {\n      text \" 1 \"\n      text \" 2 \"\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text \" 4 \"\n      text [concat \" \" [string toupper \"buzz\"] \" \"]\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text \" 7 \"\n      text \" 8 \"\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text [concat \" \" [string toupper \"buzz\"] \" \"]\n      text \" 11 \"\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text \" 13 \"\n      text \" 14 \"\n      text [concat \" \" [string toupper \"fizzbuzz\"] \" \"]\n      text \" 16 \"\n      text \" 17 \"\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text \" 19 \"\n      text [concat \" \" [string toupper \"buzz\"] \" \"]\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text \" 22 \"\n      text \" 23 \"\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text [concat \" \" [string toupper \"buzz\"] \" \"]\n      text \" 26 \"\n      text [concat \" \" [string toupper \"fizz\"] \" \"]\n      text \" 28 \"\n      text \" 29 \"\n      text [concat \" \" [string toupper \"fizzbuzz\"] \" \"]\n    }\n  }","lists":"style {\n    \".page\" {\n      padding 40px\n      max-width 600px\n      margin 0 auto\n    }\n    \".back\" {\n      display inline-block\n      color var(--fg3)\n      font-size 9px\n      text-transform uppercase\n      letter-spacing 0.08em\n      margin-bottom 24px\n    }\n    \".back:hover\" { color var(--fg) }\n    \".title\" {\n      font-family var(--serif)\n      font-size 32px\n      margin-bottom 24px\n    }\n    \".section\" {\n      margin-bottom 24px\n    }\n    \".section-title\" {\n      font-size 9px\n      text-transform uppercase\n      letter-spacing 0.12em\n      color var(--fg3)\n      margin-bottom 8px\n    }\n    \".code\" {\n      background var(--s1)\n      border 1px solid var(--border)\n      padding 12px\n      font-size 12px\n    }\n    \".result\" {\n      color var(--green)\n      margin-top 8px\n    }\n  }\n\n  set fruits [list apple banana cherry date elderberry]\n\n  div \"page\" {\n    a \"#/\" \"back\" { text \"← Back\" }\n    h1 \"title\" { text \"List Operations\" }\n\n    div \"section\" {\n      p \"section-title\" { text \"Create list\" }\n      div \"code\" {\n        text \"set fruits [list apple banana cherry date elderberry]\"\n      }\n      p \"result\" { text [concat \"Result: \" $fruits] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Length\" }\n      div \"code\" {\n        text \"llength $fruits\"\n      }\n      p \"result\" { text [concat \"Result: \" [llength $fruits]] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Index\" }\n      div \"code\" {\n        text \"lindex $fruits 2\"\n      }\n      p \"result\" { text [concat \"Result: \" [lindex $fruits 2]] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"First element\" }\n      div \"code\" {\n        text \"lindex $fruits 0\"\n      }\n      p \"result\" { text [concat \"Result: \" [lindex $fruits 0]] }\n    }\n  }","strings":"style {\n    \".page\" {\n      padding 40px\n      max-width 600px\n      margin 0 auto\n    }\n    \".back\" {\n      display inline-block\n      color var(--fg3)\n      font-size 9px\n      text-transform uppercase\n      letter-spacing 0.08em\n      margin-bottom 24px\n    }\n    \".back:hover\" { color var(--fg) }\n    \".title\" {\n      font-family var(--serif)\n      font-size 32px\n      margin-bottom 24px\n    }\n    \".section\" {\n      margin-bottom 24px\n    }\n    \".section-title\" {\n      font-size 9px\n      text-transform uppercase\n      letter-spacing 0.12em\n      color var(--fg3)\n      margin-bottom 8px\n    }\n    \".code\" {\n      background var(--s1)\n      border 1px solid var(--border)\n      padding 12px\n      font-size 12px\n    }\n    \".result\" {\n      color var(--green)\n      margin-top 8px\n    }\n  }\n\n  set msg \"Hello, Khem World!\"\n\n  div \"page\" {\n    a \"#/\" \"back\" { text \"← Back\" }\n    h1 \"title\" { text \"String Operations\" }\n\n    div \"section\" {\n      p \"section-title\" { text \"Original\" }\n      div \"code\" {\n        text [concat \"set msg \\\"\" $msg \"\\\"\"]\n      }\n      p \"result\" { text [concat \"Result: \" $msg] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Uppercase\" }\n      div \"code\" {\n        text \"string toupper $msg\"\n      }\n      p \"result\" { text [concat \"Result: \" [string toupper $msg]] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Lowercase\" }\n      div \"code\" {\n        text \"string tolower $msg\"\n      }\n      p \"result\" { text [concat \"Result: \" [string tolower $msg]] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Length\" }\n      div \"code\" {\n        text \"string length $msg\"\n      }\n      p \"result\" { text [concat \"Result: \" [string length $msg]] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Contains\" }\n      div \"code\" {\n        text [concat \"contains \\\"\" $msg \"\\\" \\\"Khem\\\"\"]\n      }\n      p \"result\" { text [concat \"Result: \" [contains $msg \"Khem\"]] }\n    }\n\n    div \"section\" {\n      p \"section-title\" { text \"Replace\" }\n      div \"code\" {\n        text [concat \"replace \\\"\" $msg \"\\\" \\\"World\\\" \\\"Universe\\\"\"]\n      }\n      p \"result\" { text [concat \"Result: \" [replace $msg \"World\" \"Universe\"]] }\n    }\n  }"},
+      actions: {},
+      
+      set(key, value) {
+        this.state[key] = String(value);
+        this.render();
+      },
+      
+      get(key) {
+        return this.state[key] || "";
+      },
+      
+      render() {
+        // Re-render current page with new state
+        const hash = window.location.hash || "#/";
+        const pageName = this.routes[hash];
+        if (!pageName || !this.pages[pageName]) return;
+        
+        const pageCode = this.pages[pageName];
+        try {
+          // Parse and evaluate with current state
+          const commands = this.parse(pageCode);
+          const html = this.evaluate(commands, this.state);
+          document.getElementById("app").innerHTML = html;
+          this.bindButtons();
+        } catch (e) {
+          console.error("Khem render error:", e);
+        }
+      },
+      
+      // Simple parser for client-side
+      parse(code) {
+        const cmds = [];
+        let i = 0;
+        const len = code.length;
+        
+        while (i < len) {
+          while (i < len && /[ \t\r\n;]/.test(code[i])) i++;
+          if (i >= len || code[i] === "#") break;
+          
+          if (code[i] === "#") {
+            while (i < len && code[i] !== "\n") i++;
+            continue;
+          }
+          
+          const cmd = [];
+          while (i < len) {
+            while (i < len && /[ \t\r]/.test(code[i])) i++;
+            if (i >= len || /[\n;]/.test(code[i])) break;
+            
+            if (code[i] === "{") {
+              i++;
+              let depth = 1, start = i;
+              while (i < len && depth > 0) {
+                if (code[i] === "{") depth++;
+                if (code[i] === "}") { depth--; if (depth === 0) break; }
+                i++;
+              }
+              cmd.push(code.slice(start, i).trim());
+              if (i < len) i++;
+              continue;
+            }
+            
+            if (code[i] === "[") {
+              i++;
+              let depth = 1, start = i;
+              while (i < len && depth > 0) {
+                if (code[i] === "[") depth++;
+                if (code[i] === "]") { depth--; if (depth === 0) break; }
+                i++;
+              }
+              const inner = code.slice(start, i).trim();
+              if (i < len) i++;
+              if (inner) {
+                cmd.push(this.evaluateSub(inner));
+              }
+              continue;
+            }
+            
+            if (code[i] === '"') {
+              i++;
+              let value = "";
+              while (i < len && code[i] !== '"') {
+                if (code[i] === "\\" && i + 1 < len) { i++; value += code[i]; }
+                else { value += code[i]; }
+                i++;
+              }
+              if (i < len) i++;
+              cmd.push(this.sub(value));
+              continue;
+            }
+            
+            let word = "";
+            while (i < len && !/[ \t\r\n;\[\]{}"#]/.test(code[i])) {
+              word += code[i];
+              i++;
+            }
+            if (word) cmd.push(word);
+          }
+          
+          if (cmd.length > 0) cmds.push(cmd);
+        }
+        return cmds;
+      },
+      
+      sub(text) {
+        if (typeof text !== "string") return text;
+        return text.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (m, name) => {
+          return this.state[name] !== undefined ? this.state[name] : m;
+        });
+      },
+      
+      evaluateSub(expr) {
+        try {
+          // Handle [expr ...]
+          const exprMatch = expr.match(/^expr\s+(.+)/);
+          if (exprMatch) {
+            const calcExpr = exprMatch[1].replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (m, name) => {
+              return this.state[name] || "0";
+            });
+            return String(eval(calcExpr));
+          }
+          
+          // Handle [concat ...]
+          const concatMatch = expr.match(/^concat\s+(.+)/);
+          if (concatMatch) {
+            return this.sub(concatMatch[1]).replace(/"/g, "");
+          }
+          
+          return this.sub(expr);
+        } catch {
+          return expr;
+        }
+      },
+      
+      evaluate(commands, state) {
+        let output = "";
+        for (const cmd of commands) {
+          if (!Array.isArray(cmd) || cmd.length === 0) continue;
+          
+          const name = cmd[0];
+          const args = cmd.slice(1);
+          
+          // HTML tag commands
+          const htmlResult = this.htmlCommand(name, args, state);
+          if (htmlResult !== null) {
+            output += htmlResult;
+            continue;
+          }
+          
+          // set command
+          if (name === "set" && args.length >= 2) {
+            state[args[0]] = this.sub(args[1]);
+            continue;
+          }
+        }
+        return output;
+      },
+      
+      htmlCommand(name, args, state) {
+        const tags = ["div","span","p","h1","h2","h3","h4","h5","h6","ul","ol","li","table","tr","td","th","section","main","header","footer","nav","article","form","label","pre","code"];
+        
+        if (tags.includes(name)) {
+          const cls = args[0] || "";
+          const content = args[1] || "";
+          const clsAttr = cls ? ' class="' + cls + '"' : "";
+          let inner = this.sub(content);
+          // Try to parse and evaluate inner content
+          try {
+            const innerCmds = this.parse(content);
+            if (innerCmds.length > 0) {
+              inner = this.evaluate(innerCmds, state);
+            }
+          } catch {}
+          return "<" + name + clsAttr + ">" + inner + "</" + name + ">";
+        }
+        
+        if (name === "text") {
+          return this.sub(args[0] || "");
+        }
+        
+        if (name === "button") {
+          const cls = args[0] || "";
+          const content = args[1] || "";
+          const action = args[2];
+          const clsAttr = cls ? ' class="' + cls + '"' : "";
+          let inner = this.sub(content);
+          try {
+            const innerCmds = this.parse(content);
+            if (innerCmds.length > 0) {
+              inner = this.evaluate(innerCmds, state);
+            }
+          } catch {}
+          
+          // Use onclick with the action string directly
+          if (action) {
+            // Store action and get a stable ID
+            const actionId = this._actionIdCounter = (this._actionIdCounter || 0) + 1;
+            const id = "btn_" + actionId;
+            this.actions[id] = action;
+            return '<button' + clsAttr + ' onclick="window.Khem.exec(&#39;' + id + '&#39;)">' + inner + '</button>';
+          }
+          
+          return "<button" + clsAttr + ">" + inner + "</button>";
+        }
+        
+        if (name === "a") {
+          const href = args[0] || "#";
+          const cls = args[1] || "";
+          const content = args[2] || "";
+          const clsAttr = cls ? ' class="' + cls + '"' : "";
+          let inner = this.sub(content);
+          try {
+            const innerCmds = this.parse(content);
+            if (innerCmds.length > 0) {
+              inner = this.evaluate(innerCmds, state);
+            }
+          } catch {}
+          return '<a href="' + this.sub(href) + '"' + clsAttr + '>' + inner + '</a>';
+        }
+        
+        return null;
+      },
+      
+      exec(actionId) {
+        const action = this.actions[actionId];
+        if (!action) return;
+        
+        // Parse action commands (simple set statements)
+        for (const line of action.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          
+          // Handle "set name value"
+          const setMatch = trimmed.match(/^set\s+(\S+)\s+(.+)$/);
+          if (setMatch) {
+            const name = setMatch[1];
+            let value = setMatch[2];
+            
+            // Handle [expr ...]
+            const exprMatch = value.match(/^\[expr\s+(.+)\]$/);
+            if (exprMatch) {
+              const calcExpr = exprMatch[1].replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (m, n) => {
+                return this.state[n] || "0";
+              });
+              try {
+                this.state[name] = String(eval(calcExpr));
+              } catch {}
+            } else {
+              this.state[name] = this.sub(value.replace(/^"|"$/g, ""));
+            }
+          }
+        }
+        
+        this.render();
+      }
+    };
+    
+    window.khemExec = (id) => window.Khem.exec(id);
+    
+    // Event delegation for buttons with data-action
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (btn) {
+        const actionId = btn.dataset.action;
+        window.Khem.exec(actionId);
+      }
+    });
+    
+    // Handle route changes
+    window.addEventListener("hashchange", () => window.Khem.render());
+    
+    // Initial button binding
+    window.Khem.render();
+  </script>
+</body>
+</html>

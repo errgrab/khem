@@ -1,7 +1,7 @@
 # todo.kh
 # Demonstrates: state (list), push, filter, foreach, derive, length, persist
 
-state todos list
+state todos "a b c"
 state filter_mode "all"
 
 derive visible {

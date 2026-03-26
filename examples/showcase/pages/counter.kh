@@ -1,0 +1,57 @@
+# counter.kh - Counter page
+state counter_val 0
+
+page "counter" {
+  style {
+    ".page" {
+      padding 40px;
+      max-width 600px;
+      margin 0 auto;
+    }
+    ".back" {
+      display inline-block;
+      color var(--fg3);
+      font-size 9px;
+      text-transform uppercase;
+      letter-spacing 0.08em;
+      margin-bottom 24px;
+    }
+    ".back:hover" { color var(--fg) }
+    ".title" {
+      font-family var(--serif);
+      font-size 32px;
+      margin-bottom 24px;
+    }
+    ".display" {
+      font-size 72px;
+      font-family var(--serif);
+      color var(--fg);
+      text-align center;
+      padding 24px 0;
+      border-bottom 1px solid var(--border);
+      margin-bottom 24px;
+    }
+    ".controls" {
+      display flex;
+      gap 12px;
+      justify-content center;
+    }
+    ".btn" {
+      font-size 24px;
+      padding 8px 24px;
+    }
+  }
+
+  div "page" {
+    a "#/" "back" { text "← Back" }
+    h1 "title" { text "Counter" }
+    p "display" { text $counter_val }
+    div "controls" {
+      button "btn" { text "-" } { set counter_val [expr $counter_val - 1] }
+      button "" { text "Reset" } { set counter_val 0 }
+      button "btn" { text "+" } { set counter_val [expr $counter_val + 1] }
+    }
+  }
+}
+
+route "#/counter" "counter"

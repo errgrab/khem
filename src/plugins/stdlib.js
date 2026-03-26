@@ -1,543 +1,266 @@
-import {
-  createScope,
-  evaluate,
-  sub,
-  toRuntimeValue,
-  unwrapControlFlow,
-} from "../core/engine.js";
-import { parse, ParseError } from "../core/parser.js";
-import { evaluateExpression } from "../core/expr.js";
+import { evaluate, sub, createScope } from "../core/engine.js";
+import { parse } from "../core/parser.js";
 
-const truthy = (value) => {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (Array.isArray(value)) return value.length > 0;
-  return String(value).length > 0;
-};
-
-const asNumber = (value) => {
-  const n = Number(value);
-  return Number.isNaN(n) ? 0 : n;
-};
-
-const reduceByOperator = (list, operator, initialValue) => {
-  const initial = initialValue ?? (list.length ? list[0] : 0);
-  const startIndex = initialValue === undefined ? 1 : 0;
-  let acc = initial;
-  for (let i = startIndex; i < list.length; i += 1) {
-    const value = list[i];
-    switch (operator) {
-      case "+":
-        acc = Number(acc) + Number(value);
-        break;
-      case "-":
-        acc = Number(acc) - Number(value);
-        break;
-      case "*":
-        acc = Number(acc) * Number(value);
-        break;
-      case "/":
-        acc = Number(acc) / Number(value);
-        break;
-      case "and":
-        acc = Boolean(acc) && Boolean(value);
-        break;
-      case "or":
-        acc = Boolean(acc) || Boolean(value);
-        break;
-      default:
-        throw new Error(`Unsupported reduce operator '${operator}'.`);
-    }
-  }
-  return acc;
-};
-
-const hasReturnSignal = (values) =>
-  Array.isArray(values) &&
-  values.some(
-    (value) =>
-      value && typeof value === "object" && value.__khemControl === "return",
-  );
-
-const resolveCondition = (value, ctx) => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const condition = sub(value, ctx);
-    try {
-      return Boolean(evaluateExpression(condition));
-    } catch (e) {
-      return truthy(condition);
-    }
-  }
-  return truthy(value);
-};
+const truthy = (v) => v && v !== "0" && v !== "false";
+const num = (v) => Number(v) || 0;
 
 export function loadStdLib(env) {
   const c = env.cmds;
 
-  c["set"] = (args, ctx) => {
-    const key = String(args[0]);
-    if (args.length > 2 && typeof args[1] === "string" && c[args[1]]) {
-      ctx.vars[key] = toRuntimeValue(c[args[1]](args.slice(2), ctx));
-      return null;
-    }
-    ctx.vars[key] = args[1] ?? null;
-    if (ctx.stateKeys?.has(key)) {
-      if (ctx.persistKeys?.has(key) && typeof localStorage !== "undefined") {
-        localStorage.setItem(
-          `khem:state:${key}`,
-          JSON.stringify({ v: ctx.persistVersion ?? 1, data: ctx.vars[key] }),
-        );
-      }
-      ctx.notifyStateChange?.(key);
-    }
-    return null;
-  };
-
-  c["state"] = (args, ctx) => {
-    const key = String(args[0]);
-    ctx.stateKeys?.add(key);
-
-    if (ctx.persistKeys?.has(key) && typeof localStorage !== "undefined") {
-      const raw = localStorage.getItem(`khem:state:${key}`);
-      if (raw !== null) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (
-            parsed &&
-            typeof parsed === "object" &&
-            Object.hasOwn(parsed, "v") &&
-            Object.hasOwn(parsed, "data")
-          ) {
-            const targetVersion = ctx.persistVersion ?? 1;
-            ctx.vars[key] =
-              parsed.v === targetVersion
-                ? parsed.data
-                : ctx.persistMigrate?.(key, parsed.v, parsed.data, targetVersion) ??
-                parsed.data;
-          } else {
-            ctx.vars[key] = parsed;
-          }
-          return null;
-        } catch (e) {
-          ctx.vars[key] = raw;
-          return null;
-        }
-      }
-    }
-
-    ctx.vars[key] = args[1] ?? null;
-    return null;
-  };
-
-  c["persist"] = (args, ctx) => {
-    const key = String(args[0]);
-    ctx.persistKeys?.add(key);
-    if (ctx.vars[key] !== undefined && typeof localStorage !== "undefined") {
-      localStorage.setItem(
-        `khem:state:${key}`,
-        JSON.stringify({ v: ctx.persistVersion ?? 1, data: ctx.vars[key] }),
-      );
-    }
-    return null;
-  };
-
-  c["persist-config"] = (args, ctx) => {
-    if (String(args[0]) !== "version") return null;
-    ctx.persistVersion = Number(args[1] ?? 1) || 1;
-    return null;
-  };
-
-  c["import"] = (args, ctx) => {
-    const spec = String(args[0] ?? "");
-    if (!spec) return null;
-
-    const moduleId = ctx.resolveModule
-      ? ctx.resolveModule(spec, ctx.__currentModule ?? ctx.entryModule ?? "")
-      : spec;
-
-    ctx.loadedModules ??= new Set();
-    if (ctx.loadedModules.has(moduleId)) return null;
-
-    const source = ctx.readModule?.(moduleId);
-    if (typeof source !== "string") {
-      throw new Error(`Unable to import module '${spec}' (resolved: ${moduleId}).`);
-    }
-
-    ctx.loadedModules.add(moduleId);
-    const prevModule = ctx.__currentModule;
-    ctx.__currentModule = moduleId;
-    try {
-      const ast = parse(source);
-      return evaluate(ast, ctx);
-    } catch (error) {
-      if (error instanceof ParseError) {
-        throw new Error(
-          `${moduleId}:${error.line}:${error.column} ${error.message}`,
-        );
-      }
-      throw error;
-    } finally {
-      ctx.__currentModule = prevModule;
-    }
-  };
-
-  c["derive"] = (args, ctx) => {
-    const key = String(args[0]);
-    const block = args[1];
-    if (!Array.isArray(block)) {
-      ctx.vars[key] = args[1] ?? null;
-      return null;
-    }
-
-    const compute = () => {
-      const local = createScope(ctx);
-      local.__activeCollector = ctx.__activeCollector ?? null;
-      const values = evaluate(block, local);
-      if (!Array.isArray(values) || values.length === 0) return null;
-      return values[values.length - 1] ?? null;
-    };
-
-    const collector = new Set();
-    ctx.__activeCollector = collector;
-    ctx.vars[key] = compute();
-    ctx.__activeCollector = null;
-    ctx.derivations?.push({ key, compute, deps: collector });
+  c["set"] = (args, scope) => {
+    scope.vars[args[0]] = args[1] ?? "";
     return null;
   };
 
   c["puts"] = (args) => {
-    console.log(args.map((a) => (a === null ? "" : String(a))).join(" "));
+    console.log(args.join(" "));
     return null;
   };
 
-  c["if"] = (args, ctx) => {
-    const condition = resolveCondition(args[0], ctx);
-    if (condition) return evaluate(args[1], ctx);
-    if (args[2] === "else" && args[3]) return evaluate(args[3], ctx);
+  c["if"] = (args, scope, env) => {
+    const [condition, trueBlock, elseKeyword, falseBlock] = args;
+    if (truthy(condition)) return evaluate(parse(trueBlock), scope, env);
+    if (elseKeyword === "else" && falseBlock) return evaluate(parse(falseBlock), scope, env);
     return null;
   };
 
-  c["expr"] = (args) => {
-    if (args.length === 1) {
-      return evaluateExpression(args[0]);
+  c["for"] = (args, scope, env) => {
+    const [varName, start, end, body] = args;
+    const outputs = [];
+    const bodyCmds = parse(body);
+    for (let i = num(start); i <= num(end); i++) {
+      const local = { vars: { ...scope.vars, [varName]: String(i) }, parent: scope.parent };
+      outputs.push(...evaluate(bodyCmds, local, env));
     }
-    return evaluateExpression(args);
+    return outputs;
   };
 
-  c["int"] = (args) => Number.parseInt(String(args[0] ?? 0), 10) || 0;
-  c["float"] = (args) => Number.parseFloat(String(args[0] ?? 0)) || 0;
-  c["bool"] = (args) => {
-    const value = String(args[0] ?? "").toLowerCase();
-    return value === "true" || value === "1" || value === "yes";
-  };
-  c["null"] = () => null;
-
-  c["for"] = (args, ctx) => {
-    const out = [];
-    const vName = String(args[0]);
-    const start = asNumber(args[1]);
-    const end = asNumber(args[2]);
-
-    for (let i = start; i <= end; i++) {
-      const lCtx = createScope(ctx);
-      lCtx.vars[vName] = i;
-      const iterOut = evaluate(args[3], lCtx);
-      out.push(...iterOut);
-      if (hasReturnSignal(iterOut)) return out;
-    }
-
-    return out;
-  };
-
-  c["foreach"] = (args, ctx) => {
-    const vName = String(args[0]);
-    const block = args[2];
-    const items = Array.isArray(args[1])
-      ? args[1].map((item) => toRuntimeValue(item))
-      : String(args[1] ?? "")
-        .split(" ")
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-    const out = [];
+  c["foreach"] = (args, scope, env) => {
+    const [varName, listStr, body] = args;
+    const items = String(listStr).split(/\s+/).filter(Boolean);
+    const bodyCmds = parse(body);
+    const outputs = [];
     for (const item of items) {
-      const lCtx = createScope(ctx);
-      lCtx.vars[vName] = item;
-      const iterOut = evaluate(block, lCtx);
-      out.push(...iterOut);
-      if (hasReturnSignal(iterOut)) return out;
+      const local = { vars: { ...scope.vars, [varName]: item }, parent: scope.parent };
+      outputs.push(...evaluate(bodyCmds, local, env));
     }
-
-    return out;
+    return outputs;
   };
 
-  c["proc"] = (args) => {
-    const name = String(args[0]);
-    const paramsBlock = args[1];
-    const body = args[2];
-
-    c[name] = (callArgs, callCtx) => {
-      const pCtx = createScope(callCtx);
-      let realParams = [];
-
-      if (Array.isArray(paramsBlock)) {
-        if (
-          paramsBlock.length > 0 &&
-          Array.isArray(paramsBlock[0]) &&
-          Array.isArray(paramsBlock[0][0])
-        ) {
-          realParams = paramsBlock[0];
-        } else {
-          realParams = paramsBlock;
-        }
+  c["proc"] = (args, scope) => {
+    const [name, rawParams, bodyStr] = args;
+    let params = [];
+    
+    if (typeof rawParams === "string") {
+      params = rawParams.split(/\s+/).filter(Boolean);
+    } else if (Array.isArray(rawParams) && rawParams.length > 0) {
+      const inner = rawParams[0];
+      if (Array.isArray(inner)) {
+        params = inner.map(p => Array.isArray(p) ? p[0] : p);
+      } else {
+        params = rawParams;
       }
+    }
 
-      realParams.forEach((stmt, i) => {
-        if (!Array.isArray(stmt)) return;
-        const first = stmt[0];
-        if (Array.isArray(first)) {
-          const vName = first[0];
-          const vDefault = first[1] || "";
-          pCtx.vars[vName] =
-            callArgs[i] !== undefined ? callArgs[i] : sub(vDefault, pCtx);
-        } else {
-          pCtx.vars[first] = callArgs[i] !== undefined ? callArgs[i] : null;
-        }
-      });
+    // Parse the body string into commands
+    const body = parse(bodyStr);
 
-      const result = evaluate(body, pCtx);
-      const control = unwrapControlFlow(result);
-      if (control.hasReturn) {
-        return control.value;
-      }
-      return result;
+    c[name] = (callArgs, callScope, env) => {
+      const local = { vars: { ...callScope.vars }, parent: callScope.parent };
+      params.forEach((p, i) => { local.vars[p] = callArgs[i] ?? ""; });
+      return evaluate(body, local, env);
     };
-
     return null;
   };
 
-  c["return"] = (args) => ({
-    __khemControl: "return",
-    value: args[0] ?? null,
-  });
+  c["return"] = (args) => ({ __khemReturn: true, value: args[0] ?? "" });
 
-  c["throw"] = (args) => {
-    throw new Error(String(args[0] ?? "Khem throw"));
-  };
-
-  c["try"] = (args, ctx) => {
-    try {
-      return evaluate(args[0], ctx);
-    } catch (error) {
-      if (args[1] !== "catch" || !args[2]) {
-        throw error;
-      }
-      const catchCtx = createScope(ctx);
-      catchCtx.vars.error = error?.message ?? String(error);
-      return evaluate(args[2], catchCtx);
-    }
-  };
-
-  c["js"] = (args, ctx) => {
-    try {
-      const res = new Function("ctx", "return " + sub(args[0], ctx))(ctx);
-      return toRuntimeValue(res);
-    } catch (e) {
-      return null;
-    }
-  };
-
-  c["math"] = (args, ctx) => {
-    try {
-      return asNumber(new Function("ctx", "return " + sub(args[0], ctx))(ctx));
-    } catch (e) {
-      return 0;
-    }
-  };
-
-  c["date"] = (args, ctx) => {
-    const cmd = args[0];
-    if (cmd === "now") return Date.now();
-    if (cmd === "format") {
-      const d = new Date(asNumber(sub(args[1], ctx)));
-      return d.toLocaleDateString();
-    }
+  c["list"] = (args) => args.join(" ");
+  c["llength"] = (args) => args[0].split(/\s+/).filter(Boolean).length;
+  c["lindex"] = (args) => args[0].split(/\s+/).filter(Boolean)[num(args[1])] ?? "";
+  c["lappend"] = (args, scope) => {
+    scope.vars[args[0]] = (scope.vars[args[0]] || "") + " " + args.slice(1).join(" ");
     return null;
   };
-
-  c["ls_set"] = (args, ctx) => {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem(
-        String(sub(args[0], ctx)),
-        String(sub(args[1], ctx)),
-      );
-    }
-    return null;
-  };
-
-  c["ls_get"] = (args, ctx) => {
-    if (typeof localStorage !== "undefined") {
-      const val = localStorage.getItem(String(sub(args[0], ctx)));
-      ctx.vars[String(args[1])] = val ?? null;
-    }
-    return null;
-  };
-
-  c["eq"] = (args) => args[0] === args[1];
-  c["gt"] = (args) => Number(args[0]) > Number(args[1]);
-  c["gte"] = (args) => Number(args[0]) >= Number(args[1]);
-  c["lt"] = (args) => Number(args[0]) < Number(args[1]);
-  c["lte"] = (args) => Number(args[0]) <= Number(args[1]);
-  c["not"] = (args) => !truthy(args[0]);
-
+  c["concat"] = (args) => args.join(" ");
   c["join"] = (args) => {
-    const list = args.slice(0, -1).map((a) => (a === null ? "" : String(a)));
-    const sep = args.length ? String(args[args.length - 1] ?? "") : "";
-    return list.join(sep);
+    // If first arg looks like a list (space-separated), join it with separator
+    // Otherwise, concatenate all arguments
+    if (args.length === 2 && args[0].includes(" ")) {
+      return args[0].split(/\s+/).join(args[1] || " ");
+    }
+    return args.join("");
   };
 
-  c["split"] = (args) => String(args[0] ?? "").split(String(args[1] ?? " "));
-  c["replace"] = (args) =>
-    String(args[0] ?? "").replaceAll(
-      String(args[1] ?? ""),
-      String(args[2] ?? ""),
-    );
-  c["trim"] = (args) => String(args[0] ?? "").trim();
-  c["upper"] = (args) => String(args[0] ?? "").toUpperCase();
-  c["lower"] = (args) => String(args[0] ?? "").toLowerCase();
-  c["slice"] = (args) => {
-    const value = args[0];
-    const start = Number(args[1] ?? 0);
-    const end = args[2] === undefined ? undefined : Number(args[2]);
-    if (Array.isArray(value)) return value.slice(start, end);
-    return String(value ?? "").slice(start, end);
-  };
-  c["contains"] = (args) => {
-    const source = args[0];
-    const needle = args[1];
-    if (Array.isArray(source)) return source.includes(needle);
-    return String(source ?? "").includes(String(needle ?? ""));
-  };
-  c["starts-with"] = (args) =>
-    String(args[0] ?? "").startsWith(String(args[1] ?? ""));
-  c["ends-with"] = (args) =>
-    String(args[0] ?? "").endsWith(String(args[1] ?? ""));
-
-  c["length"] = (args) => {
-    const value = args[0];
-    if (Array.isArray(value)) return value.length;
-    if (value && typeof value === "object") return Object.keys(value).length;
-    return String(value ?? "").length;
+  c["expr"] = (args, scope) => {
+    let expr = args.join(" ");
+    expr = expr.replace(/==/g, "===").replace(/!=/g, "!==");
+    try { return String(new Function("return " + expr)()); } 
+    catch { return "0"; }
   };
 
-  c["push"] = (args) => {
-    const list = Array.isArray(args[0]) ? [...args[0]] : [];
-    list.push(args[1]);
-    return list;
+  c["incr"] = (args, scope) => {
+    scope.vars[args[0]] = String(num(scope.vars[args[0]] || 0) + num(args[1] || 1));
+    return scope.vars[args[0]];
   };
 
-  c["pop"] = (args) => {
-    const list = Array.isArray(args[0]) ? [...args[0]] : [];
-    list.pop();
-    return list;
+  c["abs"] = (args) => String(Math.abs(num(args[0])));
+  c["round"] = (args) => String(Math.round(num(args[0])));
+  c["floor"] = (args) => String(Math.floor(num(args[0])));
+  c["ceil"] = (args) => String(Math.ceil(num(args[0])));
+  c["sqrt"] = (args) => String(Math.sqrt(num(args[0])));
+  c["max"] = (args) => String(Math.max(...args.map(num)));
+  c["min"] = (args) => String(Math.min(...args.map(num)));
+
+  c["string"] = (args) => {
+    const [op, str, ...rest] = args;
+    switch (op) {
+      case "length": return String(str.length);
+      case "index": return str[num(rest[0])] || "";
+      case "range": return str.slice(num(rest[0]), rest[1] ? num(rest[1]) + 1 : undefined);
+      case "trim": return str.trim();
+      case "toupper": return str.toUpperCase();
+      case "tolower": return str.toLowerCase();
+      case "match": {
+        const re = new RegExp(rest[0].replace(/\*/g, ".*").replace(/\?/g, "."));
+        return re.test(str) ? "1" : "0";
+      }
+      default: return "";
+    }
   };
 
-  c["find"] = (args) => {
-    const list = Array.isArray(args[0]) ? args[0] : [];
-    const needle = args[1];
-    return list.find((item) => item === needle) ?? null;
-  };
+  c["eq"] = (args) => args[0] === args[1] ? "1" : "0";
+  c["neq"] = (args) => args[0] !== args[1] ? "1" : "0";
+  c["gt"] = (args) => num(args[0]) > num(args[1]) ? "1" : "0";
+  c["lt"] = (args) => num(args[0]) < num(args[1]) ? "1" : "0";
+  c["gte"] = (args) => num(args[0]) >= num(args[1]) ? "1" : "0";
+  c["lte"] = (args) => num(args[0]) <= num(args[1]) ? "1" : "0";
+  c["not"] = (args) => truthy(args[0]) ? "0" : "1";
+  c["and"] = (args) => truthy(args[0]) && truthy(args[1]) ? "1" : "0";
+  c["or"] = (args) => truthy(args[0]) || truthy(args[1]) ? "1" : "0";
 
-  c["sort"] = (args) => {
-    const list = Array.isArray(args[0]) ? [...args[0]] : [];
-    return list.sort((a, b) => String(a).localeCompare(String(b)));
-  };
-
-  c["filter"] = (args, ctx) => {
-    const list = Array.isArray(args[0]) ? args[0] : [];
-    const fnName = String(args[1] ?? "");
-    const fn = c[fnName];
-    if (!fn) return list;
-    return list.filter((item) => truthy(fn([item, ...args.slice(2)], ctx)));
-  };
-
-  c["reduce"] = (args) => {
-    const list = Array.isArray(args[0]) ? args[0] : [];
-    const operator = String(args[1] ?? "+");
-    return reduceByOperator(list, operator, args[2]);
-  };
+  c["replace"] = (args) => args[0].replaceAll(args[1], args[2]);
+  c["trim"] = (args) => args[0].trim();
+  c["upper"] = (args) => args[0].toUpperCase();
+  c["lower"] = (args) => args[0].toLowerCase();
+  c["slice"] = (args) => args[0].slice(num(args[1]), args[2] ? num(args[2]) : undefined);
+  c["contains"] = (args) => args[0].includes(args[1]) ? "1" : "0";
+  c["starts-with"] = (args) => args[0].startsWith(args[1]) ? "1" : "0";
+  c["ends-with"] = (args) => args[0].endsWith(args[1]) ? "1" : "0";
 
   c["today"] = () => new Date().toISOString().slice(0, 10);
-  c["year-of"] = (args) => new Date(String(args[0] ?? "")).getFullYear();
-  c["month-of"] = (args) => new Date(String(args[0] ?? "")).getMonth() + 1;
-  c["day-of"] = (args) => new Date(String(args[0] ?? "")).getDate();
-  c["days-in-month"] = (args) => {
-    const year = Number(args[0] ?? new Date().getFullYear());
-    const month = Number(args[1] ?? new Date().getMonth() + 1);
-    return new Date(year, month, 0).getDate();
-  };
-  c["format-date"] = (args) => {
-    const date = new Date(String(args[0] ?? ""));
-    const locale = String(args[1] ?? "en-US");
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(locale);
+  c["clock"] = (args) => {
+    if (args[0] === "seconds") return String(Math.floor(Date.now() / 1000));
+    return new Date().toLocaleString();
   };
 
-  c["min"] = (args) => Math.min(...args.map((x) => Number(x)));
-  c["max"] = (args) => Math.max(...args.map((x) => Number(x)));
-  c["abs"] = (args) => Math.abs(Number(args[0] ?? 0));
-  c["floor"] = (args) => Math.floor(Number(args[0] ?? 0));
-  c["ceil"] = (args) => Math.ceil(Number(args[0] ?? 0));
-  c["round"] = (args) => Math.round(Number(args[0] ?? 0));
-  c["mod"] = (args) => Number(args[0] ?? 0) % Number(args[1] ?? 1);
-  c["clamp"] = (args) => {
-    const value = Number(args[0] ?? 0);
-    const low = Number(args[1] ?? 0);
-    const high = Number(args[2] ?? 0);
-    return Math.max(low, Math.min(high, value));
-  };
-  c["pow"] = (args) => Math.pow(Number(args[0] ?? 0), Number(args[1] ?? 1));
-
-  c["match"] = (args, ctx) => {
+  c["match"] = (args, scope, env) => {
     const target = args[0];
-    const clauses =
-      args.length === 2 && Array.isArray(args[1]) ? args[1] : args.slice(1);
+    
+    // Handle different argument formats
+    let clauses = [];
+    
+    if (args.length === 2 && typeof args[1] === "string") {
+      // match $x "{ 1 {...} 2 {...} }" - parse the string
+      const clauseStr = args[1];
+      const parts = [];
+      let i = 0;
+      while (i < clauseStr.length) {
+        // Skip whitespace
+        while (i < clauseStr.length && /\s/.test(clauseStr[i])) i++;
+        if (i >= clauseStr.length) break;
+        
+        // Get pattern (may be quoted)
+        let pattern = '';
+        if (clauseStr[i] === '"') {
+          i++; // skip opening quote
+          while (i < clauseStr.length && clauseStr[i] !== '"') {
+            pattern += clauseStr[i];
+            i++;
+          }
+          if (i < clauseStr.length) i++; // skip closing quote
+        } else {
+          while (i < clauseStr.length && !/[\s{}]/.test(clauseStr[i])) {
+            pattern += clauseStr[i];
+            i++;
+          }
+        }
+        
+        // Skip whitespace
+        while (i < clauseStr.length && /\s/.test(clauseStr[i])) i++;
+        
+        // Get body in braces
+        if (clauseStr[i] === '{') {
+          i++;
+          let depth = 1, body = '';
+          while (i < clauseStr.length && depth > 0) {
+            if (clauseStr[i] === '{') depth++;
+            if (clauseStr[i] === '}') { depth--; if (depth === 0) break; }
+            body += clauseStr[i];
+            i++;
+          }
+          if (i < clauseStr.length) i++; // skip }
+          parts.push([pattern.trim(), body.trim()]);
+        }
+      }
+      clauses = parts;
+    } else {
+      // match $x {pattern1 {body1}} {pattern2 {body2}} ...
+      for (let i = 1; i < args.length; i++) {
+        if (Array.isArray(args[i]) && args[i].length >= 2) {
+          clauses.push(args[i]);
+        }
+      }
+    }
+    
     let fallback = null;
-
-    for (let i = 0; i < clauses.length; i += 1) {
-      const clause = clauses[i];
-      if (!Array.isArray(clause) || clause.length < 2) continue;
-      const [pattern, block] = clause;
-      if (pattern === "default") {
-        fallback = block;
-        continue;
-      }
-      if (pattern === target) {
-        return evaluate(block, ctx);
-      }
+    for (const [pattern, bodyStr] of clauses) {
+      const body = parse(bodyStr);
+      if (pattern === "default") { fallback = body; continue; }
+      if (pattern === target) return evaluate(body, scope, env);
     }
-
-    if (fallback) return evaluate(fallback, ctx);
-    return null;
+    return fallback ? evaluate(fallback, scope, env) : null;
   };
 
-  c["list"] = (args) => args.map((arg) => toRuntimeValue(arg));
-
-  c["map"] = (args) => {
-    if (Array.isArray(args[0]) && typeof args[1] === "string" && c[args[1]]) {
-      const list = args[0];
-      const fn = c[args[1]];
-      return list.map((item) => fn([item, ...args.slice(2)], env));
+  c["try"] = (args, scope, env) => {
+    try { return evaluate(parse(args[0]), scope, env); }
+    catch (e) {
+      if (args[1] === "catch" && args[2]) {
+        const catchScope = { vars: { ...scope.vars, error: e.message }, parent: scope.parent };
+        return evaluate(parse(args[2]), catchScope, env);
+      }
+      throw e;
     }
-    const result = {};
-    for (let i = 0; i < args.length; i += 2) {
-      const key = String(args[i]);
-      result[key] = toRuntimeValue(args[i + 1]);
-    }
-    return result;
   };
 
-  // Explicit rendering command for scripts that need output from typed values.
-  c["emit"] = (args) => args[0] ?? null;
+  c["throw"] = (args) => { throw new Error(args[0]); };
+
+  c["dict"] = (args) => {
+    const [op, ...rest] = args;
+    switch (op) {
+      case "create": {
+        const pairs = [];
+        for (let i = 0; i < rest.length; i += 2) pairs.push(rest[i], rest[i + 1] || "");
+        return pairs.join(" ");
+      }
+      case "get": {
+        const items = rest[0].split(/\s+/);
+        for (let i = 0; i < items.length; i += 2) {
+          if (items[i] === rest[1]) return items[i + 1];
+        }
+        return "";
+      }
+      case "set": {
+        const items = rest[0] ? rest[0].split(/\s+/) : [];
+        const key = rest[1], val = rest[2];
+        let found = false;
+        for (let i = 0; i < items.length; i += 2) {
+          if (items[i] === key) { items[i + 1] = val; found = true; break; }
+        }
+        if (!found) items.push(key, val);
+        return items.join(" ");
+      }
+      default: return "";
+    }
+  };
 }

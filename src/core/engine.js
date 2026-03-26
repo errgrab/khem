@@ -1,114 +1,64 @@
-export const createScope = (parent) => ({
-  vars: Object.create(parent.vars),
-  cmds: parent.cmds,
-  styles: parent.styles,
+export const createScope = (parent = null) => ({
+  vars: { ...(parent?.vars || {}) },
+  parent,
 });
 
-export const isRuntimeValue = (value) => {
-  if (value === null) return true;
-  if (Array.isArray(value)) return true;
-  if (typeof value === "object") return true;
-  return ["string", "number", "boolean"].includes(typeof value);
-};
-
-export const sub = (s, ctx) => {
-  if (typeof s !== "string") return s;
-  const exactVar = s.match(/^\$([a-zA-Z0-9_-]+)$/);
-  if (exactVar) {
-    ctx.__activeCollector?.add(exactVar[1]);
-    const val = ctx.vars[exactVar[1]];
-    return val !== undefined ? val : s;
-  }
-  return s.replace(/\\\$|\$([a-zA-Z0-9_-]+)/g, (m, v) => {
-    if (m === "\\$") return "$";
-    ctx.__activeCollector?.add(v);
-    const val = ctx.vars[v];
-    return val !== undefined ? String(val) : m;
+export function sub(text, scope) {
+  if (typeof text !== "string") return text;
+  return text.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (match, name) => {
+    const value = scope?.vars?.[name] ?? scope?.parent?.vars?.[name];
+    return value !== undefined ? String(value) : match;
   });
-};
+}
 
-export const toRuntimeValue = (value) => {
-  if (value === undefined) return null;
-  if (value === null) return null;
-  if (Array.isArray(value)) return value;
-  if (typeof value === "object") return value;
-  if (typeof value === "boolean" || typeof value === "number") return value;
-  if (typeof value === "string") return value;
-  return String(value);
-};
+export function evaluate(commands, scope, env) {
+  const outputs = [];
 
-export const renderValue = (value, ctx) => {
-  if (value === null || value === undefined) return "";
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    // Blocks/lists are rendered item-by-item.
-    return value.map((item) => renderValue(item, ctx)).join("");
-  }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value);
-};
+  for (const cmd of commands) {
+    if (!Array.isArray(cmd) || cmd.length === 0) continue;
+    
+    // Handle command substitution result (nested array)
+    if (Array.isArray(cmd[0]) && !Array.isArray(cmd[0][0])) {
+      const result = evaluate(cmd, scope, env);
+      return result;
+    }
 
-export const renderValues = (values, ctx) => {
-  if (!Array.isArray(values)) return renderValue(values, ctx);
-  return values.map((value) => renderValue(value, ctx)).join("");
-};
-
-export function evaluate(ast, ctx) {
-  if (!Array.isArray(ast)) return [];
-  const out = [];
-  for (const stmt of ast) {
-    if (!Array.isArray(stmt) || !stmt.length) continue;
-    const cmdName = stmt[0];
-    const rawArgs = stmt.slice(1);
-    const command = ctx.cmds[cmdName];
+    const cmdName = typeof cmd[0] === "string" ? cmd[0] : null;
+    if (!cmdName) continue;
+    
+    const rawArgs = cmd.slice(1);
+    const command = env.cmds[cmdName];
 
     if (!command) {
-      console.error(`Khem Error: Unknown command '${cmdName}'`);
+      console.error(`Unknown command: '${cmdName}'`);
       continue;
     }
 
-    const args = rawArgs.map((arg) =>
-      Array.isArray(arg) ? arg : toRuntimeValue(sub(arg, ctx)),
-    );
-    let result = toRuntimeValue(command(args, ctx));
+    // Process arguments: evaluate nested arrays (command substitution)
+    // Pass both processed and raw args - raw for commands that need them
+    const args = rawArgs.map(arg => {
+      if (Array.isArray(arg)) {
+        const result = evaluate(arg, scope, env);
+        return result.join(" ");
+      }
+      return sub(arg, scope);
+    });
 
-    if (result && typeof result === "object" && result.__khemControl === "return") {
-      return [result];
+    const result = command(args, scope, env, rawArgs);
+    
+    if (result && result.__khemReturn) {
+      return [result.value ?? ""];
     }
-
-    if (!isRuntimeValue(result)) {
-      throw new Error(
-        `Khem Error: Command '${cmdName}' returned unsupported runtime value.`,
-      );
+    
+    if (result !== undefined && result !== null) {
+      outputs.push(String(result));
     }
-
-    out.push(result);
   }
 
-  return out;
+  return outputs;
 }
 
-export const unwrapControlFlow = (resultList) => {
-  if (!Array.isArray(resultList) || !resultList.length) {
-    return { hasReturn: false, value: null };
-  }
-  const maybeControl = resultList[resultList.length - 1];
-  if (
-    maybeControl &&
-    typeof maybeControl === "object" &&
-    maybeControl.__khemControl === "return"
-  ) {
-    return { hasReturn: true, value: maybeControl.value ?? null };
-  }
-  return { hasReturn: false, value: null };
-};
-
-export const render = (ast, ctx) => renderValues(evaluate(ast, ctx), ctx);
+export function render(commands, env) {
+  const scope = createScope();
+  return evaluate(commands, scope, env).join("");
+}
