@@ -2,14 +2,29 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Khem",
   "scopeName": "source.khem",
-  "fileTypes": ["kh", "khem"],
+  "fileTypes": [
+    "kh",
+    "khem"
+  ],
   "patterns": [
-    { "include": "#comments" },
-    { "include": "#strings" },
-    { "include": "#numbers" },
-    { "include": "#keywords" },
-    { "include": "#variables" },
-    { "include": "#braces" }
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#braces"
+    }
   ],
   "repository": {
     "comments": {
@@ -27,7 +42,10 @@
           "begin": "\"",
           "end": "\"",
           "patterns": [
-            { "name": "constant.character.escape.khem", "match": "\\\\." }
+            {
+              "name": "constant.character.escape.khem",
+              "match": "\\\\."
+            }
           ]
         }
       ]
@@ -62,8 +80,14 @@
     },
     "braces": {
       "patterns": [
-        { "name": "punctuation.section.block.begin.khem", "match": "\\{" },
-        { "name": "punctuation.section.block.end.khem", "match": "\\}" }
+        {
+          "name": "punctuation.section.block.begin.khem",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.block.end.khem",
+          "match": "\\}"
+        }
       ]
     }
   }

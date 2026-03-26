@@ -12,7 +12,7 @@ export function createEnvironment() {
     persistKeys: new Set(),
     derivations: [],
     renderers: [],
-    notifyStateChange: () => {},
+    notifyStateChange: () => { },
   };
 
   env.notifyStateChange = (changedKeys = []) => {

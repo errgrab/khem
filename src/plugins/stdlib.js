@@ -115,7 +115,7 @@ export function loadStdLib(env) {
               parsed.v === targetVersion
                 ? parsed.data
                 : ctx.persistMigrate?.(key, parsed.v, parsed.data, targetVersion) ??
-                  parsed.data;
+                parsed.data;
           } else {
             ctx.vars[key] = parsed;
           }
@@ -257,9 +257,9 @@ export function loadStdLib(env) {
     const items = Array.isArray(args[1])
       ? args[1].map((item) => toRuntimeValue(item))
       : String(args[1] ?? "")
-          .split(" ")
-          .map((item) => item.trim())
-          .filter(Boolean);
+        .split(" ")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
     const out = [];
     for (const item of items) {

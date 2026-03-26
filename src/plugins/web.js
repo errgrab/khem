@@ -232,25 +232,39 @@ export function loadWebLib(env) {
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg: #0a0a0a; --s0: #101010; --s1: #161616; --surface: #141414; --border: #272727; --b2: #333333;
+        --bg: #0a0a0a; --s0: #101010; --s1: #161616; --s2: #1e1e1e; --s3: #262626; --border: #272727; --b2: #333333;
         --fg: #d4d0c8; --fg1: #aaaaaa; --fg2: #888888; --fg3: #555555; --dim: #484848;
-        --acc: #c8a84b; --acc-dim: #7a6628; --green: #6b9e78; --red: #a86b6b; --blue: #7a8fa8;
-        --mono: 'DM Mono', monospace; --serif: 'Instrument Serif', serif;
+        --acc: #c8a84b; --acc-dim: #7a6628; --green: #6b9e78; --green-dim: #2a4a33;
+        --red: #a86b6b; --red-dim: #4a2222; --blue: #7a8fa8; --blue-dim: #2a3a4a; --amber: #d4924a;
+        --mono: 'DM Mono', 'Fira Mono', ui-monospace, monospace; --serif: 'Instrument Serif', Georgia, serif;
       }
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         background: var(--bg); color: var(--fg); font-family: var(--mono);
         font-size: 12px; line-height: 1.6; -webkit-font-smoothing: antialiased;
       }
-      h1, h2, h3 { font-family: var(--serif); font-weight: normal; }
-      .field { background: var(--bg); border: 1px solid var(--border); color: var(--fg); padding: 8px 10px; outline: none; transition: 0.15s; font-family: inherit; }
+      h1, h2 { font-family: var(--serif); font-weight: normal; }
+      h3, h4, h5, h6 { font-family: var(--mono); font-weight: 500; }
+      p { color: var(--fg1); }
+      code { color: var(--acc); font-size: 10.5px; }
+
+      .field { background: var(--s1); border: 1px solid var(--border); color: var(--fg); padding: 8px 10px; outline: none; transition: 0.15s; font-family: inherit; }
       .field:focus { border-color: var(--acc); }
-      button { background: transparent; border: 1px solid var(--border); color: var(--fg1); padding: 4px 12px; cursor: pointer; font-family: inherit; transition: 0.15s; }
-      button:hover { border-color: var(--acc); color: var(--fg); }
+      button { background: transparent; border: 1px solid var(--border); color: var(--fg2); padding: 4px 12px; cursor: pointer; font-family: inherit; transition: 0.15s; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+      button:hover { border-color: var(--b2); color: var(--fg); }
+
+      .khem-modal { border: 1px solid var(--border); background: var(--s2); padding: 12px; }
+      .khem-modal-card { border: 1px solid var(--border); background: var(--s1); padding: 10px; }
+      .khem-tabs { border: 1px solid var(--border); background: var(--s0); padding: 8px; }
+      .khem-toast { border: 1px solid #1e3a22; background: #0e1a10; color: var(--green); padding: 6px 10px; display: inline-flex; }
+      .khem-table { width: 100%; display: block; border: 1px solid var(--border); background: var(--s1); }
+      .khem-table > div:last-child { border-bottom: none; }
+      .khem-table td, .khem-table th { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+      .khem-form { display: grid; gap: 8px; border: 1px solid var(--border); background: var(--s1); padding: 10px; }
+      .khem-datepicker { min-height: 30px; }
       ${compiledCss}
     </style>
-    ${
-      ctx.requiresClientRuntime
+    ${ctx.requiresClientRuntime
         ? `<script>
       window.Khem = {
         createScope: p => ({ vars: Object.create(p.vars), cmds: p.cmds }),
@@ -283,7 +297,7 @@ export function loadWebLib(env) {
       };
     </script>`
         : ""
-    }
+      }
 </head>
 <body>${bodyHtml}</body>
 </html>`;

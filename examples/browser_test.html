@@ -1,55 +1,63 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <title>Khem Native Script Test</title>
-        <!-- Load the Khem bootstrapper -->
-        <script type="module" src="../src/index.js"></script>
-        <style>
-            body {
-                background: #0a0a0a;
-                color: #d4d0c8;
-                font-family: monospace;
-                padding: 2rem;
-            }
-            .container {
-                border: 1px solid #272727;
-                padding: 1rem;
-            }
-            h1 {
-                color: #c8a84b;
-            }
-            input {
-                width: 25%;
-                padding: 0.5rem;
-                border: 1px solid #272727;
-                margin: 1rem;
-                margin-bottom: 1rem;
-                background: #1a1a1a;
-                color: #d4d0c8;
-                font-family: monospace;
-            }
-            input:focus {
-                outline: none;
-                border-color: #c8a84b;
-            }
-            button {
-                padding: 0.5rem 1rem;
-                background: #1a1a1a;
-                color: #d4d0c8;
-                border: 1px solid #272727;
-                font-family: monospace;
-                cursor: pointer;
-            }
-            button:hover {
-                border-color: #c8a84b;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="app"></div>
-        <!-- Inline Khem script -->
-        <script type="text/khem-template" id="khem-code">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Khem Native Script Test</title>
+    <!-- Load the Khem bootstrapper -->
+    <script type="module" src="../src/index.js"></script>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #d4d0c8;
+            font-family: monospace;
+            padding: 2rem;
+        }
+
+        .container {
+            border: 1px solid #272727;
+            padding: 1rem;
+        }
+
+        h1 {
+            color: #c8a84b;
+        }
+
+        input {
+            width: 25%;
+            padding: 0.5rem;
+            border: 1px solid #272727;
+            margin: 1rem;
+            margin-bottom: 1rem;
+            background: #1a1a1a;
+            color: #d4d0c8;
+            font-family: monospace;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #c8a84b;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: #1a1a1a;
+            color: #d4d0c8;
+            border: 1px solid #272727;
+            font-family: monospace;
+            cursor: pointer;
+        }
+
+        button:hover {
+            border-color: #c8a84b;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+    <!-- Inline Khem script -->
+    <script type="text/khem-template" id="khem-code">
             div "container" {
                 h1 { text "Welcome, $name!" }
                 p { text "This content was rendered automatically from a &lt;script type='text/khem'&gt; block." }
@@ -78,31 +86,32 @@
                 }
             }
         </script>
-        <!-- This is a hack and may be changed in the future -->
-        <script type="module">
-            import { run, createEnvironment } from "../src/index.js";
-            window.khemState = { name: "User" };
-            window.updateKhem = () => {
-                const app = document.getElementById("app");
-                const code = document.getElementById("khem-code").textContent;
+    <!-- This is a hack and may be changed in the future -->
+    <script type="module">
+        import { run, createEnvironment } from "../src/index.js";
+        window.khemState = { name: "User" };
+        window.updateKhem = () => {
+            const app = document.getElementById("app");
+            const code = document.getElementById("khem-code").textContent;
 
-                const input = document.getElementById("name-input");
-                if (input) {
-                    window.khemState.name = input.value || "User";
-                }
+            const input = document.getElementById("name-input");
+            if (input) {
+                window.khemState.name = input.value || "User";
+            }
 
-                const env = createEnvironment();
-                env.vars.name = window.khemState.name;
+            const env = createEnvironment();
+            env.vars.name = window.khemState.name;
 
-                try {
-                    const html = run(code, env);
-                    app.innerHTML = html;
-                    console.log("Khem Re-rendered with name:", env.vars.name);
-                } catch (e) {
-                    console.error("Khem Render Error:", e);
-                }
-            };
-            window.updateKhem();
-        </script>
-    </body>
+            try {
+                const html = run(code, env);
+                app.innerHTML = html;
+                console.log("Khem Re-rendered with name:", env.vars.name);
+            } catch (e) {
+                console.error("Khem Render Error:", e);
+            }
+        };
+        window.updateKhem();
+    </script>
+</body>
+
 </html>

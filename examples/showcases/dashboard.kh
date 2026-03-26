@@ -9,16 +9,59 @@ derive health {
 
 document "Khem Dashboard Showcase" {
   style {
-    ".app" { padding 24px display flex flex-direction column gap 12px }
-    ".grid" { display grid grid-template-columns "repeat(3, minmax(0, 1fr))" gap 10px }
-    ".card" { background var(--s1) border 1px solid var(--border) padding 12px }
-    ".muted" { color var(--fg2) font-size 11px }
-    ".value" { font-size 18px }
+    ".app" {
+      padding 20px
+      max-width 980px
+      margin 0 auto
+      display flex
+      flex-direction column
+      gap 10px
+    }
+    ".grid" {
+      display grid
+      grid-template-columns "repeat(3, minmax(0, 1fr))"
+      gap 8px
+    }
+    ".card" {
+      background var(--s1)
+      border 1px solid var(--border)
+      padding 10px
+      display flex
+      flex-direction column
+      gap 3px
+    }
+    ".muted" {
+      color var(--fg2)
+      font-size 10px
+      text-transform uppercase
+      letter-spacing 0.09em
+    }
+    ".value" {
+      font-size 14px
+      color var(--fg)
+    }
+    ".status" {
+      display inline-flex
+      border 1px solid var(--green-dim)
+      background var(--s1)
+      color var(--green)
+      padding "1px 6px"
+      font-size 9.5px
+      letter-spacing 0.08em
+      text-transform uppercase
+      width fit-content
+    }
+    ".controls" {
+      margin-top 6px
+      display flex
+      gap 8px
+    }
   }
 
   div "app" {
     h1 "" { text "$title" }
     p "muted" { text "Reactive state + derive showcase" }
+    span "status" { text "kh" }
 
     div "grid" {
       div "card" {
@@ -35,20 +78,22 @@ document "Khem Dashboard Showcase" {
       }
     }
 
-    row {
-      button {
-        text "+ Users"
-        action {
-          set users expr "$users + 5"
+    div "controls" {
+      row {
+        button {
+          text "+ Users"
+          action {
+            set users expr "$users + 5"
+          }
         }
-      }
-      button {
-        text "Toggle Errors"
-        action {
-          if "$errors > 0" {
-            set errors 0
-          } else {
-            set errors 3
+        button {
+          text "Toggle Errors"
+          action {
+            if "$errors > 0" {
+              set errors 0
+            } else {
+              set errors 3
+            }
           }
         }
       }

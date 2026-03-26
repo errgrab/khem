@@ -137,6 +137,7 @@ Khem follows a strict visual identity:
 * **Typography**: DM Mono for 95% of the UI; Instrument Serif for branding.
 * **Colors**: Primary Accent `#c8a84b` (Gold) over Background `#0a0a0a`.
 * **Density**: 12px base font size with 1.6 line-height.
+* **Full design spec**: [`style.md`](style.md)
 
 ---
 
