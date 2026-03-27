@@ -6,21 +6,8 @@ import path from "node:path";
 
 export function runWeb(code, env) {
   const scope = { vars: env.vars, parent: null };
-
   evaluate(parse(code), scope, env);
-
-  const ctx = env._web;
-  if (!ctx || !Object.keys(ctx.pages).length) return "";
-
-  const pages = {};
-
-  for (const [name, body] of Object.entries(ctx.pages)) {
-    const s = { vars: { ...env.vars }, parent: null };
-    pages[name] = evaluate(parse(body), s, env).join("");
-  }
-
-  const defaultPage = ctx.routes["#/"] ?? Object.keys(pages)[0];
-  return pages[defaultPage] ?? "";
+  return generateHTML(env);
 }
 
 const getCtx = (env) => {
@@ -43,21 +30,17 @@ const renderWeb = (src, scope, env) => {
 };
 
 function tagArgs(args, scope, env) {
-  if (args.length === 1) {
-    return {
-      cls: "",
-      body: renderWeb(args[0], scope, env),
-    };
-  }
+  if (args.length < 1 || args.length > 2)
+    throw new Error("tag expects 1 or 2 arguments");
 
-  if (args.length === 2) {
-    return {
-      cls: ` class="${args[0]}"`,
-      body: renderWeb(args[1], scope, env),
-    };
-  }
+  const hasClass = args.length === 2;
+  const className = hasClass ? args[0] : "";
+  const bodyRaw = hasClass ? args[1] : args[0];
 
-  throw new Error("tag expects 1 or 2 arguments");
+  return {
+    cls: className ? ` class="${className}"` : "",
+    body: renderWeb(bodyRaw, scope, env),
+  };
 }
 
 export function loadWebLib(env) {
@@ -158,9 +141,32 @@ export function loadWebLib(env) {
   };
 
   c["input"] = (args) => {
-    const id = args[0] ? ` id="${args[0]}"` : "";
-    const cls = args[1] ? ` class="${args[1]}"` : ' class="field"';
-    return `<input${id}${cls}>`;
+    let id = "",
+      cls = "field",
+      attrsStr = "";
+
+    if (args.length === 1) {
+      attrsStr = args[0];
+    } else if (args.length === 2) {
+      cls = args[0];
+      attrsStr = args[1];
+    } else if (args.length >= 3) {
+      id = args[0];
+      cls = args[1];
+      attrsStr = args[2];
+    }
+
+    const parsedAttrs = attrsStr
+      ? parse(attrsStr)
+          .map(([k, ...v]) => (v.length ? `${k}="${v.join(" ")}"` : k))
+          .join(" ")
+      : "";
+
+    const idAttr = id ? ` id="${id}"` : "";
+    const clsAttr = cls ? ` class="${cls}"` : "";
+    const extraAttrs = parsedAttrs ? ` ${parsedAttrs}` : "";
+
+    return `<input${idAttr}${clsAttr}${extraAttrs}>`;
   };
 
   c["br"] = () => "<br>";

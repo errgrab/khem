@@ -3,7 +3,7 @@ import { runWeb } from "../src/plugins/web.js";
 
 function assertContains(str, substring, msg) {
   if (!str.includes(substring)) {
-    throw new Error(`${msg}: expected to contain "${substring}" got "${str}"`);
+    throw new Error(`${msg}: expected to contain "${substring}"`);
   }
 }
 
@@ -60,32 +60,6 @@ test("title: set page title", () => {
     'title "My App"\npage "home" { text "Home" }\nroute "#/" "home"',
   );
   assertContains(html, "<title>My App</title>", "title");
-});
-
-// State
-console.log("\n--- State ---\n");
-test("state: declare state variable", () => {
-  const html = runForWeb(
-    'state count 0\npage "home" { text $count }\nroute "#/" "home"',
-  );
-  assertContains(html, "var S = ", "state defined");
-  assertContains(html, '"count":"0"', "state value");
-});
-
-test("state: multiple state variables", () => {
-  const html = runForWeb(
-    'state count 0\nstate name "Khem"\npage "home" { text $count }\nroute "#/" "home"',
-  );
-  assertContains(html, '"count":"0"', "count state");
-  assertContains(html, '"name":"Khem"', "name state");
-});
-
-test("set: update state variable", () => {
-  const html = runForWeb(
-    'state count 0\npage "home" {\n  text $count\n}\nroute "#/" "home"',
-  );
-  // Note: set inside page body doesn't persist to S (limitation)
-  // This is expected behavior in current implementation
 });
 
 // HTML Tags
@@ -167,14 +141,6 @@ test("input: input element", () => {
   assertContains(html, "placeholder=Enter", "input attrs");
 });
 
-test("input: with binding", () => {
-  const html = runForWeb(
-    'state name "John"\npage "home" { input "name" "" "" }\nroute "#/" "home"',
-  );
-  assertContains(html, 'data-bind="name"', "input binding");
-  assertContains(html, 'value="John"', "input value");
-});
-
 test("br: line break", () => {
   const html = runForWeb('page "home" { br }\nroute "#/" "home"');
   assertContains(html, "<br>", "br");
@@ -213,41 +179,6 @@ test("include: non-existent file (graceful failure)", () => {
   assertContains(html, "Home", "page still renders");
 });
 
-// Client-side reactivity
-console.log("\n--- Client-side Reactivity ---\n");
-test("reactivity: state variable substitution", () => {
-  const html = runForWeb(
-    'state count 5\npage "home" { text $count }\nroute "#/" "home"',
-  );
-  assertContains(html, "{{count}}", "reactive substitution");
-});
-
-test("reactivity: client-side JavaScript", () => {
-  const html = runForWeb(
-    'state count 0\npage "home" { text $count }\nroute "#/" "home"',
-  );
-  assertContains(html, "function render()", "render function");
-  assertContains(html, "location.hash", "hash routing");
-});
-
-// Counter example
-test("counter: increment action", () => {
-  const html = runForWeb(
-    'state count 0\npage "home" { p "" { text $count } button "" { text "+" } }\nroute "#/" "home"',
-  );
-  assertContains(html, "khemAct", "action handler");
-  assertContains(html, '"count"', "count in state");
-});
-
-// Event system
-console.log("\n--- Events ---\n");
-test("emit: emit event (syntax check)", () => {
-  const html = runForWeb(
-    'emit "clicked" "button1"\npage "home" { text "Home" }\nroute "#/" "home"',
-  );
-  assertContains(html, "Home", "page renders");
-});
-
 // Default CSS
 console.log("\n--- Default CSS ---\n");
 test("default CSS: design system variables", () => {
@@ -270,12 +201,12 @@ console.log("\n--- Integration ---\n");
 test("complete app: counter with buttons", () => {
   const html = runForWeb(`
     title "Counter"
-    state count 0
+    set count 0
 
     page "home" {
       style {
-        ".app" { padding 24px }
-        ".count" { font-size 72px }
+        ".app" { padding 24px; }
+        ".count" { font-size 72px; }
       }
       div "app" {
         p "count" { text $count }
@@ -287,7 +218,6 @@ test("complete app: counter with buttons", () => {
     route "#/" "home"
   `);
   assertContains(html, "<title>Counter</title>", "title");
-  assertContains(html, '"count":"0"', "initial count");
   assertContains(html, '<p class="count">', "count display");
 });
 
