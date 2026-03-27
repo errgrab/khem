@@ -3,44 +3,45 @@
 page "lists" {
   style {
     ".page" {
-      padding 40px
-      max-width 600px
-      margin 0 auto
+      padding: 40px;
+      max-width: 520px;
+      margin: 0 auto;
     }
-    ".back" {
-      display inline-block
-      color var(--fg3)
-      font-size 9px
-      text-transform uppercase
-      letter-spacing 0.08em
-      margin-bottom 24px
+    ".back {
+      display: inline-block;
+      color: var(--fg3);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 20px;
+      text-decoration: none;
     }
-    ".back:hover" { color var(--fg) }
+    ".back:hover" { color: var(--fg); }
     ".title" {
-      font-family var(--serif)
-      font-size 32px
-      margin-bottom 24px
+      font-family: var(--serif);
+      font-size: 28px;
+      margin-bottom: 20px;
     }
-    ".section" {
-      margin-bottom 24px
-    }
+    ".section { margin-bottom: 20px; }"
     ".section-title" {
-      font-size 9px
-      text-transform uppercase
-      letter-spacing 0.12em
-      color var(--fg3)
-      margin-bottom 8px
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--fg3);
+      margin-bottom: 6px;
     }
     ".code" {
-      background var(--s1)
-      border 1px solid var(--border)
-      padding 12px
-      font-size 12px
+      background: var(--s1);
+      border: 1px solid var(--border);
+      padding: 10px;
+      font-size: 11px;
+      color: var(--fg1);
     }
-    ".result" {
-      color var(--green)
-      margin-top 8px
-    }
+    ".result {
+      color: var(--green);
+      margin-top: 6px;
+      font-size: 11px;
+    }"
   }
 
   set fruits [list apple banana cherry date elderberry]
@@ -51,33 +52,25 @@ page "lists" {
 
     div "section" {
       p "section-title" { text "Create list" }
-      div "code" {
-        text "set fruits [list apple banana cherry date elderberry]"
-      }
+      div "code" { text "set fruits \[list apple banana cherry date elderberry\]" }
       p "result" { text [concat "Result: " $fruits] }
     }
 
     div "section" {
       p "section-title" { text "Length" }
-      div "code" {
-        text "llength $fruits"
-      }
+      div "code" { text "llength \$fruits" }
       p "result" { text [concat "Result: " [llength $fruits]] }
     }
 
     div "section" {
       p "section-title" { text "Index" }
-      div "code" {
-        text "lindex $fruits 2"
-      }
+      div "code" { text "lindex \$fruits 2" }
       p "result" { text [concat "Result: " [lindex $fruits 2]] }
     }
 
     div "section" {
       p "section-title" { text "First element" }
-      div "code" {
-        text "lindex $fruits 0"
-      }
+      div "code" { text "lindex \$fruits 0" }
       p "result" { text [concat "Result: " [lindex $fruits 0]] }
     }
   }

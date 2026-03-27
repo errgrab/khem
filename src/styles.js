@@ -125,4 +125,5 @@ select.field { cursor: pointer; }
 .table th { color: var(--fg2); font-weight: normal; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; }
 `;
 
-export const GOOGLE_FONTS = "https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap";
+export const GOOGLE_FONTS =
+  "https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap";

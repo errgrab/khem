@@ -1,4 +1,4 @@
-import { run, createEnvironment, parse, evaluate } from "../src/index.js";
+import { run, createEnvironment } from "../src/index.js";
 
 function assertEqual(actual, expected, msg) {
   if (actual !== expected) {
@@ -61,7 +61,10 @@ test("if: false condition", () => {
 
 test("if: else with condition", () => {
   const env = createEnvironment();
-  run("set x 5\nif { gt $x 3 } { set result big } else { set result small }", env);
+  run(
+    "set x 5\nif { gt $x 3 } { set result big } else { set result small }",
+    env,
+  );
   assertEqual(env.vars.result, "big", "if with comparison");
 });
 
@@ -96,13 +99,19 @@ test("foreach: multiple items", () => {
 // match (pattern matching)
 test("match: exact match", () => {
   const env = createEnvironment();
-  run('set x "hello"\nmatch $x { "hello" { set result greeting } "bye" { set result farewell } }', env);
+  run(
+    'set x "hello"\nmatch $x { "hello" { set result greeting } "bye" { set result farewell } }',
+    env,
+  );
   assertEqual(env.vars.result, "greeting", "match exact value");
 });
 
 test("match: default case", () => {
   const env = createEnvironment();
-  run('set x "unknown"\nmatch $x { "hello" { set result greeting } default { set result other } }', env);
+  run(
+    'set x "unknown"\nmatch $x { "hello" { set result greeting } default { set result other } }',
+    env,
+  );
   assertEqual(env.vars.result, "other", "match default");
 });
 
@@ -150,12 +159,12 @@ test("llength: list length", () => {
 });
 
 test("lindex: get element", () => {
-  const result = run('lindex [list a b c] 1');
+  const result = run("lindex [list a b c] 1");
   assertEqual(result.trim(), "b", "list index");
 });
 
 test("lindex: out of bounds", () => {
-  const result = run('lindex [list a b] 5');
+  const result = run("lindex [list a b] 5");
   assertEqual(result.trim(), "", "list index out of bounds");
 });
 
@@ -409,7 +418,7 @@ test("dict set: new key", () => {
 console.log("\n--- Error Handling ---\n");
 test("throw: throw error", () => {
   try {
-    run("throw \"error message\"");
+    run('throw "error message"');
     throw new Error("should have thrown");
   } catch (e) {
     if (e.message === "error message") return;
@@ -418,9 +427,9 @@ test("throw: throw error", () => {
 });
 
 test("try: successful try", () => {
-  const result = run('try { set x 1 } catch { set y 2 }');
+  const result = run("try { set x 1 } catch { set y 2 }");
   const env = createEnvironment();
-  run('try { set x 1 } catch { set y 2 }', env);
+  run("try { set x 1 } catch { set y 2 }", env);
   assertEqual(env.vars.x, "1", "try success");
 });
 

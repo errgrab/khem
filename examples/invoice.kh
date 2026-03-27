@@ -15,12 +15,11 @@ set client_email "billing@acme.example"
 set client_addr  "San Francisco, CA"
 
 # Line items: list of "description|qty|unit_price"
-set items list {
-  "Brand identity design|1|1800"
-  "UI component library|3|420"
-  "Accessibility audit|1|650"
+set items list \
+  "Brand identity design|1|1800" \
+  "UI component library|3|420" \
+  "Accessibility audit|1|650" \
   "Monthly retainer (Apr)|1|1200"
-}
 
 set tax_rate 0.23   # 23% VAT
 

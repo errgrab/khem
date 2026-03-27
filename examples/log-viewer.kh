@@ -4,18 +4,17 @@
 
 state level_filter "all"
 
-set logs list {
-  "info|Server started on port 4173"
-  "info|Environment: production"
-  "warn|Memory usage above 80%"
-  "error|Failed to connect to cache: ECONNREFUSED"
-  "info|Request: GET / 200 in 4ms"
-  "info|Request: GET /api/users 200 in 12ms"
-  "warn|Slow query detected: 340ms"
-  "error|Unhandled exception in worker thread"
-  "info|Request: POST /api/data 201 in 8ms"
+set logs list \
+  "info|Server started on port 4173" \
+  "info|Environment: production" \
+  "warn|Memory usage above 80%" \
+  "error|Failed to connect to cache: ECONNREFUSED" \
+  "info|Request: GET / 200 in 4ms" \
+  "info|Request: GET /api/users 200 in 12ms" \
+  "warn|Slow query detected: 340ms" \
+  "error|Unhandled exception in worker thread" \
+  "info|Request: POST /api/data 201 in 8ms" \
   "info|Graceful shutdown initiated"
-}
 
 derive visible_logs {
   if "$level_filter == all" {

@@ -4,39 +4,40 @@ import path from "node:path";
 import http from "node:http";
 import readline from "node:readline";
 import { spawn } from "node:child_process";
-import { run, createEnvironment, runForWeb, processScriptTags } from "../src/index.js";
-import { ParseError } from "../src/core/parser.js";
+import { parse } from "../src/core/parser.js";
+import { run, createEnvironment, processScriptTags } from "../src/index.js";
 
 const [, , cmd, ...args] = process.argv;
 
 const printError = (error, file = "<stdin>") => {
-  if (error instanceof ParseError) {
-    console.error(`${file}:${error.line}:${error.column} ${error.message}`);
-    return;
-  }
   console.error(error?.stack || String(error));
 };
 
 const isWebFile = (code) => {
-  return /^\s*(page|route|state|title)\s/m.test(code) || 
-         code.includes("<script type=\"text/khem\">");
+  return (
+    /^\s*(page|route|state|title)\s/m.test(code) ||
+    code.includes('<script type="text/khem">')
+  );
 };
 
 const compileFile = (filePath, forceWeb = false) => {
   const absPath = path.resolve(filePath);
   const code = fs.readFileSync(absPath, "utf8");
   const baseDir = path.dirname(absPath);
-  
+
   // Check if it's a web file or forced web mode
   if (forceWeb || isWebFile(code)) {
     return runForWeb(code, undefined, baseDir);
   }
-  
+
   // Check if it's an HTML file with khem script tags
-  if (filePath.endsWith(".html") || code.includes("<script type=\"text/khem\">")) {
+  if (
+    filePath.endsWith(".html") ||
+    code.includes('<script type="text/khem">')
+  ) {
     return processScriptTags(code);
   }
-  
+
   return run(code);
 };
 
@@ -71,14 +72,17 @@ const startRepl = () => {
 
 const watchFile = (filePath, forceWeb = false) => {
   const absPath = path.resolve(filePath);
-  const ext = forceWeb || isWebFile(fs.readFileSync(absPath, "utf8")) ? ".html" : ".txt";
+  const ext =
+    forceWeb || isWebFile(fs.readFileSync(absPath, "utf8")) ? ".html" : ".txt";
   const outPath = absPath.replace(/\.[^.]+$/, ext);
 
   const build = () => {
     try {
       const output = compileFile(absPath, forceWeb);
       fs.writeFileSync(outPath, output, "utf8");
-      console.log(`[khem] rebuilt ${path.basename(outPath)} at ${new Date().toISOString()}`);
+      console.log(
+        `[khem] rebuilt ${path.basename(outPath)} at ${new Date().toISOString()}`,
+      );
     } catch (error) {
       printError(error, absPath);
     }
@@ -119,17 +123,19 @@ const serveFile = (filePath, port = 4173, forceWeb = false) => {
 
     try {
       let output = compileFile(absPath, forceWeb);
-      
+
       // Inject live reload script
       const reloadScript = `<script>const es=new EventSource('/__khem_events');es.onmessage=(e)=>{if(e.data==='reload')location.reload();};</script>`;
-      
+
       if (output.includes("</body>")) {
         output = output.replace("</body>", `${reloadScript}</body>`);
       } else {
         output += reloadScript;
       }
 
-      const contentType = output.startsWith("<!DOCTYPE") ? "text/html" : "text/plain";
+      const contentType = output.startsWith("<!DOCTYPE")
+        ? "text/html"
+        : "text/plain";
       res.writeHead(200, { "Content-Type": `${contentType}; charset=utf-8` });
       res.end(output);
     } catch (error) {

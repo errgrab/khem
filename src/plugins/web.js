@@ -1,269 +1,221 @@
 import { parse } from "../core/parser.js";
-import { evaluate, sub } from "../core/engine.js";
+import { evaluate } from "../core/engine.js";
 import { DEFAULT_CSS, GOOGLE_FONTS } from "../styles.js";
 import fs from "node:fs";
 import path from "node:path";
 
-let webState = {};
-let webPages = {};
-let webRoutes = {};
-let webStyles = [];
-let webTitle = "Khem App";
-let webIncludes = new Set();
-let actionCounter = 0;
-let webActions = {};
+export function runWeb(code, env) {
+  const scope = { vars: env.vars, parent: null };
 
-export function resetWebState() {
-  webState = {};
-  webPages = {};
-  webRoutes = {};
-  webStyles = [];
-  webTitle = "Khem App";
-  webIncludes = new Set();
-  actionCounter = 0;
-  webActions = {};
+  evaluate(parse(code), scope, env);
+
+  const ctx = env._web;
+  if (!ctx || !Object.keys(ctx.pages).length) return "";
+
+  const pages = {};
+
+  for (const [name, body] of Object.entries(ctx.pages)) {
+    const s = { vars: { ...env.vars }, parent: null };
+    pages[name] = evaluate(parse(body), s, env).join("");
+  }
+
+  const defaultPage = ctx.routes["#/"] ?? Object.keys(pages)[0];
+  return pages[defaultPage] ?? "";
+}
+
+const getCtx = (env) => {
+  if (!env._web)
+    env._web = {
+      title: "Khem App",
+      pages: {},
+      routes: {},
+      styles: [],
+      scripts: [],
+      includes: new Set(),
+    };
+  return env._web;
+};
+
+const renderWeb = (src, scope, env) => {
+  if (typeof src !== "string")
+    throw new Error("RenderWeb: source must be a string");
+  return evaluate(parse(src), scope, env).join("");
+};
+
+function tagArgs(args, scope, env) {
+  if (args.length === 1) {
+    return {
+      cls: "",
+      body: renderWeb(args[0], scope, env),
+    };
+  }
+
+  if (args.length === 2) {
+    return {
+      cls: ` class="${args[0]}"`,
+      body: renderWeb(args[1], scope, env),
+    };
+  }
+
+  throw new Error("tag expects 1 or 2 arguments");
 }
 
 export function loadWebLib(env) {
   const c = env.cmds;
+  const ctx = getCtx(env);
 
-  c["state"] = (args, scope) => {
-    const name = args[0];
-    const value = args[1] ?? "";
-    if (!(name in webState)) webState[name] = value;
-    scope.vars[name] = webState[name];
-    return null;
+  const makeTag = (tag) => (args, scope) => {
+    const { cls, body } = tagArgs(args, scope, env);
+    return `<${tag}${cls}>${body}</${tag}>`;
   };
 
-  c["set"] = (args, scope) => {
-    scope.vars[args[0]] = args[1] ?? "";
-    return null;
+  c["title"] = ([t]) => {
+    ctx.title = t ?? "Khem App";
+  };
+  c["page"] = ([name, body]) => {
+    ctx.pages[name] = body ?? "";
+  };
+  c["route"] = ([path, page]) => {
+    ctx.routes[path] = page;
+  };
+  c["style"] = ([s]) => {
+    if (s) ctx.styles.push(s);
+  };
+  c["script"] = ([s]) => {
+    if (s) ctx.scripts.push(s);
+  };
+  c["text"] = ([t]) => t ?? "";
+
+  c["document"] = ([title, body]) => {
+    if (title) ctx.title = title;
+    ctx.pages["__doc__"] = body ?? "";
+    ctx.routes["#/"] = "__doc__";
   };
 
-  c["page"] = (args, scope, env, rawArgs) => {
-    webPages[args[0]] = rawArgs?.[1] ?? args[1] ?? "";
-    return null;
-  };
+  c["include"] = ([file], scope) => {
+    if (!file) return;
 
-  c["route"] = (args) => {
-    webRoutes[args[0]] = args[1];
-    return null;
-  };
+    const base = env._baseDir ?? process.cwd();
+    const abs = path.resolve(base, file);
+    if (ctx.includes.has(abs)) return;
 
-  c["title"] = (args) => {
-    webTitle = args[0] ?? "Khem App";
-    return null;
-  };
+    ctx.includes.add(abs);
 
-  c["include"] = (args, scope, env) => {
-    const filePath = args[0];
-    if (!filePath) return null;
-    const baseDir = env._baseDir || process.cwd();
-    const absPath = path.resolve(baseDir, filePath);
-    if (webIncludes.has(absPath)) return null;
-    webIncludes.add(absPath);
+    const prev = env._baseDir;
     try {
-      const code = fs.readFileSync(absPath, "utf8");
-      const origBase = env._baseDir;
-      env._baseDir = path.dirname(absPath);
-      evaluate(parse(code), { vars: env.vars, parent: null }, env);
-      env._baseDir = origBase;
+      env._baseDir = path.dirname(abs);
+      renderWeb(fs.readFileSync(abs, "utf8"), scope, env);
     } catch (e) {
-      console.error(`Khem include error: ${e.message}`);
+      console.error(`include error: ${e.message}`);
+    } finally {
+      env._baseDir = prev;
     }
-    return null;
   };
 
-  c["style"] = (args, scope, env, rawArgs) => {
-    const css = rawArgs?.[0] ?? args[0];
-    if (typeof css === "string") webStyles.push(parseKhemCSS(css));
-    return null;
-  };
-
-  // Text content - preserve $var for client-side reactivity
-  c["text"] = (args, scope, env, rawArgs) => {
-    // Use rawArgs to preserve $var for client-side substitution
-    const content = rawArgs?.[0] ?? args[0] ?? "";
-    if (typeof content === "string") return content;
-    return String(content);
-  };
-
-  // HTML tags
-  ["div","span","p","h1","h2","h3","h4","h5","h6","ul","ol","li",
-   "table","tr","td","th","section","main","header","footer","nav",
-   "article","form","label","pre","code","blockquote","strong","em"].forEach(tag => {
-    c[tag] = (args, scope, env) => {
-      const cls = args[0] ?? "";
-      const content = args[1] ?? "";
-      const clsAttr = cls ? ` class="${sub(cls, scope)}"` : "";
-      const rendered = renderInner(content, scope, env);
-      return `<${tag}${clsAttr}>${rendered}</${tag}>`;
-    };
+  [
+    "div",
+    "span",
+    "p",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "li",
+    "table",
+    "tr",
+    "td",
+    "th",
+    "section",
+    "main",
+    "header",
+    "footer",
+    "nav",
+    "article",
+    "form",
+    "label",
+    "pre",
+    "code",
+    "blockquote",
+    "strong",
+    "em",
+  ].forEach((tag) => {
+    c[tag] = makeTag(tag);
   });
 
-  // Button with action
-  c["button"] = (args, scope, env, rawArgs) => {
-    const cls = args[0] ?? "";
-    const content = args[1] ?? "";
-    const actionStr = rawArgs?.[2];
-    const clsAttr = cls ? ` class="${sub(cls, scope)}"` : "";
-    const rendered = renderInner(content, scope, env);
-    if (actionStr && typeof actionStr === "string") {
-      const actId = "act_" + (++actionCounter);
-      webActions[actId] = actionStr.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, "{{$1}}");
-      return `<button${clsAttr} onclick="khemAct('${actId}')">${rendered}</button>`;
-    }
-    return `<button${clsAttr}>${rendered}</button>`;
-  };
-
-  // Link
-  c["a"] = (args, scope, env) => {
+  c["a"] = (args, scope) => {
     const href = args[0] ?? "#";
-    const cls = args[1] ?? "";
-    const content = args[2] ?? "";
-    const clsAttr = cls ? ` class="${sub(cls, scope)}"` : "";
-    return `<a href="${sub(href, scope)}"${clsAttr}>${renderInner(content, scope, env)}</a>`;
+    const { cls, body } = tagArgs(args.slice(1), scope, env);
+    return `<a href="${href}"${cls}>${body}</a>`;
   };
 
-  // Input with optional binding
-  c["input"] = (args, scope) => {
-    const bind = args[0] ?? "";
-    const cls = args[1] ?? "";
-    const attrs = args[2] ?? "";
-    
-    let clsAttr = cls ? ` class="${sub(cls, scope)}"` : "";
-    let bindAttr = "";
-    let valueAttr = "";
-    
-    if (bind) {
-      const val = scope.vars[bind] ?? webState[bind] ?? "";
-      bindAttr = ` data-bind="${bind}"`;
-      valueAttr = ` value="${sub(val, scope)}"`;
-      if (!cls) clsAttr = ` class="field"`;
-    }
-    
-    const attrStr = attrs ? ` ${sub(attrs, scope)}` : "";
-    return `<input${clsAttr}${bindAttr}${valueAttr}${attrStr}>`;
+  c["button"] = (args, scope) => {
+    const { cls, body } = tagArgs(args, scope, env);
+    return `<button${cls}>${body}</button>`;
+  };
+
+  c["input"] = (args) => {
+    const id = args[0] ? ` id="${args[0]}"` : "";
+    const cls = args[1] ? ` class="${args[1]}"` : ' class="field"';
+    return `<input${id}${cls}>`;
   };
 
   c["br"] = () => "<br>";
   c["hr"] = () => "<hr>";
+  c["img"] = ([src = "", alt = ""]) => `<img src="${src}" alt="${alt}">`;
 }
 
-function renderInner(content, scope, env) {
-  if (typeof content === "string") {
-    return evaluate(parse(content), scope, env).join("");
-  }
-  return sub(String(content || ""), scope);
-}
+export function generateHTML(env) {
+  const ctx = getCtx(env);
 
-function parseKhemCSS(str) {
-  let output = "";
-  const lines = str.split("\n").map(l => l.trim()).filter(Boolean);
-  let selector = "", props = [];
-  for (const line of lines) {
-    if (line.endsWith("{")) { selector = line.slice(0, -1).trim(); props = []; }
-    else if (line === "}") { if (selector && props.length) output += `${selector} { ${props.join(" ")} }\n`; selector = ""; }
-    else if (line) props.push(line.endsWith(";") ? line : line + ";");
+  const pages = {};
+  for (const [name, body] of Object.entries(ctx.pages)) {
+    const scope = { vars: { ...env.vars }, parent: null };
+    pages[name] = renderWeb(body, scope, env);
   }
-  return output;
-}
 
-export function generateHTML(env, code) {
-  const css = DEFAULT_CSS + webStyles.join("\n");
-  
-  // Render pages to HTML, then convert $var to {{var}} for client-side reactivity
-  const htmlTemplates = {};
-  for (const [name, pageBody] of Object.entries(webPages)) {
-    const scope = { vars: { ...webState }, parent: null };
-    const rendered = evaluate(parse(pageBody), scope, env).join("");
-    // Convert $var to {{var}} in the rendered HTML
-    htmlTemplates[name] = rendered.replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, "{{$1}}");
-  }
-  
-  // Get default page
-  const firstRoute = Object.keys(webRoutes)[0];
-  const defaultPage = firstRoute ? webRoutes[firstRoute] : Object.keys(htmlTemplates)[0];
-  const initialHtml = defaultPage ? htmlTemplates[defaultPage] : "";
+  const pageNames = Object.keys(pages);
+  const defaultPage = ctx.routes["#/"] ?? pageNames[0];
+  const initial = pages[defaultPage] ?? "";
+
+  // Only include routing if there are multiple pages
+  const needsRouting = pageNames.length > 1;
+  const routingJS = needsRouting
+    ? `
+    var T = ${JSON.stringify(pages)};
+    var R = ${JSON.stringify(ctx.routes)};
+    function route() {
+      var page = R[location.hash || "#/"] || Object.keys(T)[0];
+      if (page && T[page]) document.getElementById("app").innerHTML = T[page];
+    }
+    window.addEventListener("hashchange", route);
+    route();
+  `
+    : "";
+
+  const userStyles = ctx.styles.join("\n");
+  const userScripts = ctx.scripts.join("\n");
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${webTitle}</title>
+  <title>${ctx.title}</title>
   <link href="${GOOGLE_FONTS}" rel="stylesheet">
-  <style>${css}</style>
+  <style>
+    ${DEFAULT_CSS}
+    ${userStyles}
+  </style>
 </head>
 <body>
-  <div id="app">${initialHtml}</div>
+  <div id="app">${initial}</div>
   <script>
-    var S = ${JSON.stringify(webState)};
-    var T = ${JSON.stringify(htmlTemplates)};
-    var R = ${JSON.stringify(webRoutes)};
-    var A = ${JSON.stringify(webActions)};
-
-    function sub(s) {
-      if (typeof s !== "string") return s;
-      return s.replace(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, function(m, k) {
-        return S[k] !== undefined ? S[k] : m;
-      });
-    }
-
-    function render() {
-      var hash = location.hash || "#/";
-      var page = R[hash] || Object.keys(T)[0];
-      if (!page || !T[page]) return;
-      document.getElementById("app").innerHTML = sub(T[page]);
-      bindInputs();
-    }
-
-    function bindInputs() {
-      document.querySelectorAll("[data-bind]").forEach(function(el) {
-        var key = el.dataset.bind;
-        if (S[key] !== undefined) el.value = S[key];
-        el.oninput = function() {
-          S[key] = el.value;
-          render();
-        };
-      });
-    }
-
-    function khemAct(id) {
-      var act = A[id];
-      if (!act) return;
-
-      var lines = act.split("\\n");
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (!line) continue;
-
-        var m = line.match(/^set\\s+(\\S+)\\s+(.+)$/);
-        if (!m) continue;
-
-        var name = m[1];
-        var val = m[2].trim();
-
-        var em = val.match(/^\\[(.+)\\]$/);
-        if (em) {
-          var inner = em[1];
-          if (inner.startsWith("expr ")) {
-            var expr = inner.slice(5).replace(/\\{\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}\\}/g, function(_, k) {
-              return S[k] || "0";
-            });
-            try { S[name] = String(eval(expr)); } catch(e) { S[name] = "0"; }
-          }
-        } else {
-          val = val.replace(/^"|"$/g, "");
-          S[name] = sub(val);
-        }
-      }
-      render();
-    }
-
-    window.khemAct = khemAct;
-    window.addEventListener("hashchange", render);
-    render();
+    ${routingJS}
+    ${userScripts}
   </script>
 </body>
 </html>`;

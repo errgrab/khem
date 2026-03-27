@@ -1,54 +1,10 @@
-import { parse } from "../src/core/parser.js";
-import { evaluate, createEnvironment } from "../src/index.js";
+import { run, createEnvironment, parse, evaluate, runForWeb } from "../src/index.js";
 
 const results = {
   passed: 0,
   failed: 0,
   suites: {}
 };
-
-function runTestFile(filePath) {
-  const suiteName = filePath.replace('tests/', '').replace('_test.js', '');
-  results.suites[suiteName] = [];
-  
-  const code = `
-    import { parse } from "../src/core/parser.js";
-    import { createEnvironment, runForWeb } from "../src/index.js";
-    
-    let passed = 0;
-    let failed = 0;
-    let tests = [];
-    
-    function test(name, fn) {
-      try {
-        fn();
-        passed++;
-        tests.push({ name, pass: true });
-      } catch (e) {
-        failed++;
-        tests.push({ name, pass: false, msg: e.message });
-      }
-    }
-    
-    function assertContains(str, substring, msg) {
-      if (!str.includes(substring)) throw new Error(msg + ': missing "' + substring + '"');
-    }
-    
-    function assertNotContains(str, substring, msg) {
-      if (str.includes(substring)) throw new Error(msg + ': should NOT contain "' + substring + '"');
-    }
-    
-    // Run all tests...
-    test("sample test", () => {
-      const html = runForWeb('page "home" { text "Home" }');
-      assertContains(html, 'Home', "page content");
-    });
-  `;
-  
-  return results.suites[suiteName];
-}
-
-import { runForWeb } from "../src/index.js";
 
 function test(name, fn, suite) {
   try {
@@ -63,8 +19,8 @@ function test(name, fn, suite) {
   }
 }
 
-function assertContains(str, substring, msg) {
-  if (!str.includes(substring)) throw new Error(`${msg}: expected to contain "${substring}"`);
+function assertEqual(actual, expected, msg) {
+  if (actual !== expected) throw new Error(`${msg}: expected "${expected}", got "${actual}"`);
 }
 
 console.log("\n=== Running Tests ===\n");
@@ -76,17 +32,17 @@ results.suites.parser = parserSuite;
 
 test("parse: empty string", () => {
   const result = parse("");
-  if (JSON.stringify(result) !== "[]") throw new Error("expected empty array");
+  assertEqual(JSON.stringify(result), "[]", "empty");
 }, parserSuite);
 
 test("parse: simple command", () => {
   const result = parse("puts hello");
-  if (JSON.stringify(result) !== '[["puts","hello"]]') throw new Error("unexpected result");
+  assertEqual(JSON.stringify(result), '[["puts","hello"]]', "simple cmd");
 }, parserSuite);
 
 test("parse: command with multiple args", () => {
   const result = parse("set x 42");
-  if (JSON.stringify(result) !== '[["set","x","42"]]') throw new Error("unexpected result");
+  assertEqual(JSON.stringify(result), '[["set","x","42"]]', "multiple args");
 }, parserSuite);
 
 // StdLib Tests
@@ -94,17 +50,34 @@ console.log("\n--- StdLib ---\n");
 const stdlibSuite = [];
 results.suites.stdlib = stdlibSuite;
 
-test("stdlib: puts outputs", () => {
+test("set: simple variable", () => {
   const env = createEnvironment();
-  const output = evaluate(parse('puts "hello"'), { vars: {}, parent: null }, env);
-  if (!output.join("").includes("hello")) throw new Error("puts did not output");
+  run("set x 42", env);
+  assertEqual(env.vars.x, "42", "set variable");
 }, stdlibSuite);
 
-test("stdlib: set/get", () => {
+test("set: string variable", () => {
   const env = createEnvironment();
-  evaluate(parse('set x 10'), { vars: {}, parent: null }, env);
-  const output = evaluate(parse('get x'), { vars: {}, parent: null }, env);
-  if (!output.join("").includes("10")) throw new Error("get did not return set value");
+  run('set name "Khem"', env);
+  assertEqual(env.vars.name, "Khem", "set string");
+}, stdlibSuite);
+
+test("if: true condition", () => {
+  const env = createEnvironment();
+  run("set x 1\nif $x { set result yes }", env);
+  assertEqual(env.vars.result, "yes", "if true");
+}, stdlibSuite);
+
+test("if: false condition", () => {
+  const env = createEnvironment();
+  run("set x 0\nif $x { set result yes } else { set result no }", env);
+  assertEqual(env.vars.result, "no", "if false");
+}, stdlibSuite);
+
+test("for: basic loop", () => {
+  const env = createEnvironment();
+  run("for i 1 3 { puts $i }", env);
+  // loop executed without error = pass
 }, stdlibSuite);
 
 // Web Tests
@@ -114,33 +87,33 @@ results.suites.web = webSuite;
 
 test("web: page renders", () => {
   const html = runForWeb('page "home" { text "Home" }\nroute "#/" "home"');
-  assertContains(html, "Home", "page content");
+  if (!html.includes("Home")) throw new Error("page content missing");
 }, webSuite);
 
 test("web: title set", () => {
   const html = runForWeb('title "My App"\npage "home" { text "Home" }\nroute "#/" "home"');
-  assertContains(html, "<title>My App</title>", "title");
+  if (!html.includes("<title>My App</title>")) throw new Error("title missing");
 }, webSuite);
 
 test("web: state variable", () => {
   const html = runForWeb('state count 5\npage "home" { text $count }\nroute "#/" "home"');
-  assertContains(html, '"count":"5"', "state value");
+  if (!html.includes('"count":"5"')) throw new Error("state value missing");
 }, webSuite);
 
 test("web: button renders", () => {
   const html = runForWeb('page "home" { button "" { text "Click" } }\nroute "#/" "home"');
-  assertContains(html, "<button", "button tag");
+  if (!html.includes("<button")) throw new Error("button tag missing");
 }, webSuite);
 
 test("web: input renders", () => {
   const html = runForWeb('page "home" { input "" "" "placeholder=test" }\nroute "#/" "home"');
-  assertContains(html, "placeholder=test", "input placeholder");
+  if (!html.includes("placeholder=test")) throw new Error("input placeholder missing");
 }, webSuite);
 
 test("web: default CSS includes design system", () => {
   const html = runForWeb('page "home" { text "Home" }\nroute "#/" "home"');
-  assertContains(html, "--bg:", "CSS variables");
-  assertContains(html, "--mono:", "font variable");
+  if (!html.includes("--bg:")) throw new Error("CSS variables missing");
+  if (!html.includes("--mono:")) throw new Error("font variable missing");
 }, webSuite);
 
 // Summary

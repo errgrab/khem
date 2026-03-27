@@ -1,104 +1,106 @@
-export class ParseError extends Error {
-  constructor(message, line = 1, column = 1) {
-    super(message);
-    this.name = "ParseError";
-    this.line = line;
-    this.column = column;
-  }
-}
-
 export function parse(code) {
   const cmds = [];
   let i = 0;
   const len = code.length;
 
-  while (i < len) {
-    // Skip whitespace (but not newlines - they end commands)
-    while (i < len && /[ \t\r]/.test(code[i])) i++;
-    if (i >= len) break;
+  const peek = () => code[i];
+  const eat = () => code[i++];
+  const space = (c) => c === " " || c === "\t" || c === "\r";
+  const sep = (c) => c === ";" || c === "\n";
+  const end = () => i >= len;
 
-    // Skip comments
-    if (code[i] === '#') {
-      while (i < len && code[i] !== '\n') i++;
+  const skipSpaces = () => {
+    while (!end() && space(peek())) eat();
+  };
+
+  const readBraced = () => {
+    eat(); // skip {
+    let depth = 1,
+      start = i;
+    while (!end()) {
+      const c = eat();
+      if (c === "{") depth++;
+      else if (c === "}") {
+        if (--depth === 0) break;
+      }
+    }
+    return code.slice(start, i - 1).trim(); // exclude closing }
+  };
+
+  const readBracket = () => {
+    eat(); // skip [
+    let depth = 1,
+      start = i;
+    while (!end()) {
+      const c = eat();
+      if (c === "[") depth++;
+      else if (c === "]") {
+        if (--depth === 0) break;
+      }
+    }
+    // Recursively parse the inner command
+    return parse(code.slice(start, i - 1).trim()); // exclude closing ]
+  };
+
+  const readQuoted = () => {
+    eat(); // skip "
+    let s = "";
+    while (!end() && peek() !== '"') {
+      const c = eat();
+      s += c === "\\" && !end() ? eat() : c;
+    }
+    if (!end()) eat(); // skip "
+    return s;
+  };
+
+  const readWord = () => {
+    let s = "";
+    while (!end()) {
+      const c = peek();
+      if (
+        space(c) ||
+        sep(c) ||
+        c === "#" ||
+        c === "[" ||
+        c === "]" ||
+        c === "{" ||
+        c === "}" ||
+        c === '"'
+      )
+        break;
+      s += eat();
+    }
+    return s;
+  };
+
+  const readCmd = () => {
+    const cmd = [];
+    while (!end()) {
+      skipSpaces();
+      if (end()) break;
+      const c = peek();
+      if (sep(c) || c === "#") break;
+      if (c === "{") cmd.push(readBraced());
+      else if (c === "[") cmd.push(readBracket());
+      else if (c === '"') cmd.push(readQuoted());
+      else cmd.push(readWord());
+    }
+    return cmd;
+  };
+
+  while (!end()) {
+    skipSpaces();
+    if (end()) break;
+    const c = peek();
+    if (sep(c)) {
+      eat();
       continue;
     }
-
-    // Semicolon or newline separates commands
-    if (code[i] === ';' || code[i] === '\n') { i++; continue; }
-
-    const cmd = [];
-    
-    while (i < len) {
-      // Skip whitespace before word (but not newlines)
-      while (i < len && /[ \t\r]/.test(code[i])) i++;
-      if (i >= len) break;
-
-    // Semicolon or newline ends command
-    if (code[i] === ';' || code[i] === '\n') break;
-
-    // Comment inside command
-    if (code[i] === '#') {
-      while (i < len && code[i] !== '\n') i++;
-      break;
+    if (c === "#") {
+      while (!end() && peek() !== "\n") eat();
+      continue;
     }
-
-    // Command substitution [ ... ]
-      if (code[i] === '[') {
-        i++; // skip [
-        let depth = 1, start = i;
-        while (i < len && depth > 0) {
-          if (code[i] === '[') depth++;
-          if (code[i] === ']') { depth--; if (depth === 0) break; }
-          i++;
-        }
-        const inner = code.slice(start, i).trim();
-        if (i < len) i++; // skip ]
-        if (inner) cmd.push(parse(inner)); // recursively parse
-        continue;
-      }
-
-      // Braced literal { ... }
-      if (code[i] === '{') {
-        i++; // skip {
-        let depth = 1, start = i;
-        while (i < len && depth > 0) {
-          if (code[i] === '{') depth++;
-          if (code[i] === '}') { depth--; if (depth === 0) break; }
-          i++;
-        }
-        const value = code.slice(start, i).trim();
-        if (i < len) i++; // skip }
-        cmd.push(value);
-        continue;
-      }
-
-      // Quoted string " ... "
-      if (code[i] === '"') {
-        i++; // skip "
-        let value = '';
-        while (i < len && code[i] !== '"') {
-          if (code[i] === '\\' && i + 1 < len) {
-            i++;
-            value += code[i];
-          } else {
-            value += code[i];
-          }
-          i++;
-        }
-        if (i < len) i++; // skip "
-        cmd.push(value);
-        continue;
-      }
-
-      // Regular word
-      let word = '';
-      while (i < len && !/[\s;#\[\]{}"]/.test(code[i])) {
-        word += code[i];
-        i++;
-      }
-      if (word) cmd.push(word);
-    }
-
+    const cmd = readCmd();
     if (cmd.length > 0) cmds.push(cmd);
   }
 

@@ -1,6 +1,6 @@
 {
-  "passed": 9,
-  "failed": 2,
+  "passed": 14,
+  "failed": 0,
   "suites": {
     "parser": [
       {
@@ -18,14 +18,24 @@
     ],
     "stdlib": [
       {
-        "name": "stdlib: puts outputs",
-        "pass": false,
-        "msg": "puts did not output"
+        "name": "set: simple variable",
+        "pass": true
       },
       {
-        "name": "stdlib: set/get",
-        "pass": false,
-        "msg": "get did not return set value"
+        "name": "set: string variable",
+        "pass": true
+      },
+      {
+        "name": "if: true condition",
+        "pass": true
+      },
+      {
+        "name": "if: false condition",
+        "pass": true
+      },
+      {
+        "name": "for: basic loop",
+        "pass": true
       }
     ],
     "web": [

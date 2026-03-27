@@ -17,10 +17,10 @@ Khem web apps use:
 Define a page that can be routed to:
 
 ```tcl
-page "home" {
-  div "container" {
-    h1 "" { text "Welcome" }
-    p "" { text "Hello, World!" }
+page home {
+  div container {
+    h1 { text Welcome }
+    p { text "Hello, World!" }
   }
 }
 ```
@@ -30,8 +30,8 @@ page "home" {
 Map a hash URL to a page:
 
 ```tcl
-route "#/" "home"
-route "#/about" "about"
+route #/ home
+route #/about about
 ```
 
 ### title
@@ -49,7 +49,7 @@ Declare a reactive state variable:
 ```tcl
 state count 0
 state items [list a b c]
-state name "World"
+state name World
 ```
 
 ### set
@@ -58,7 +58,7 @@ Update a state variable (triggers re-render):
 
 ```tcl
 set count 5
-set name "Khem"
+set name Khem
 ```
 
 ### style
@@ -67,8 +67,8 @@ Add CSS styles (follows style.md design system):
 
 ```tcl
 style {
-  ".container" { padding 24px }
-  ".display" { font-size 48px }
+  .container { padding 24px }
+  .display { font-size 48px }
   button { border-radius 4px }
 }
 ```
@@ -87,8 +87,8 @@ include "./pages/about.kh"
 Emit an event with data:
 
 ```tcl
-emit "clicked" "button-id"
-emit "dataReady" "some data"
+emit clicked button-id
+emit dataReady some data
 ```
 
 ### on
@@ -96,7 +96,7 @@ emit "dataReady" "some data"
 Listen for an event:
 
 ```tcl
-on "clicked" {
+on clicked {
   puts "Button clicked: $data"
 }
 ```
@@ -106,40 +106,40 @@ on "clicked" {
 All standard HTML tags are available as commands:
 
 ```tcl
-# Format: tag "class" { content }
-div "container" { ... }
-p "text-class" { text "Hello" }
-span "badge" { text "NEW" }
-h1 "" { text "Title" }
-h2 "" { text "Subtitle" }
+# Format: tag class { content }
+div container { ... }
+p text-class { text "Hello" }
+span badge { text "NEW" }
+h1 { text "Title" }
+h2 { text "Subtitle" }
 
 # Button
-button "btn-class" { text "Click me" }
+button btn-class { text "Click me" }
 
 # Link
-a "#/about" "link-class" { text "About" }
+a #/about link-class { text "About" }
 
 # List
-ul "" {
-  li "" { text "Item 1" }
-  li "" { text "Item 2" }
+ul {
+  li { text "Item 1" }
+  li { text "Item 2" }
 }
 
 # Table
-table "" {
-  tr "" {
-    td "" { text "Cell 1" }
-    td "" { text "Cell 2" }
+table {
+  tr {
+    td { text "Cell 1" }
+    td { text "Cell 2" }
   }
 }
 ```
 
 ### Special Tags
 
-- `input "class" "attrs"` - Input element
-- `textarea "class" "attrs" "value"` - Textarea
-- `select "class" "attrs" { options }` - Select dropdown
-- `img "class" "src=..."` - Image
+- `input class attrs` - Input element
+- `textarea class attrs value` - Textarea
+- `select class attrs { options }` - Select dropdown
+- `img class src=...` - Image
 - `br` - Line break
 - `hr` - Horizontal rule
 
@@ -149,24 +149,24 @@ table "" {
 title "Counter"
 state count 0
 
-page "home" {
+page home {
   style {
-    ".app" { padding 24px; text-align center }
-    ".count" { font-size 72px; font-family var(--serif) }
-    ".controls" { display flex; gap 12px; justify-content center }
+    .app { padding 24px; text-align center }
+    .count { font-size 72px; font-family var(--serif) }
+    .controls { display flex; gap 12px; justify-content center }
   }
 
-  div "app" {
-    p "count" { text $count }
+  div app {
+    p count { text $count }
     
-    div "controls" {
-      button "" { text "-" }
-      button "" { text "+" }
+    div controls {
+      button { text "-" }
+      button { text "+" }
     }
   }
 }
 
-route "#/" "home"
+route #/ home
 ```
 
 Build with:
@@ -178,17 +178,17 @@ khem build counter.kh -o counter.html
 
 **app.kh** (main file):
 ```tcl
-title "My Site"
+title My Site
 
-page "home" {
-  h1 "" { text "Welcome" }
-  ul "" {
-    li "" { a "#/counter" "" { text "Counter Demo" } }
-    li "" { a "#/about" "" { text "About" } }
+page home {
+  h1 { text "Welcome" }
+  ul {
+    li { a #/counter { text "Counter Demo" } }
+    li { a #/about { text "About" } }
   }
 }
 
-route "#/" "home"
+route #/ home
 
 include "./pages/counter.kh"
 include "./pages/about.kh"
@@ -198,26 +198,26 @@ include "./pages/about.kh"
 ```tcl
 state count 0
 
-page "counter" {
-  div "counter-page" {
-    p "" { text [concat "Count: " $count] }
-    button "" { text "Increment" }
+page counter {
+  div counter-page {
+    p { text [concat "Count: " $count] }
+    button { text "Increment" }
   }
 }
 
-route "#/counter" "counter"
+route #/counter counter
 ```
 
 **pages/about.kh**:
 ```tcl
-page "about" {
-  div "about-page" {
-    h1 "" { text "About" }
-    p "" { text "Built with Khem!" }
+page about {
+  div about-page {
+    h1 { text "About" }
+    p { text "Built with Khem!" }
   }
 }
 
-route "#/about" "about"
+route #/about about
 ```
 
 ## Embedded Scripts
@@ -235,8 +235,8 @@ Use `<script type="text/khem">` to embed Khem in HTML:
   <div class="card">
     <h2>Math Demo</h2>
     <script type="text/khem">
-      p "" { text [concat "2 + 2 = " [expr 2 + 2]] }
-      p "" { text [concat "10 * 5 = " [expr 10 * 5]] }
+      p { text [concat "2 + 2 = " [expr 2 + 2]] }
+      p { text [concat "10 * 5 = " [expr 10 * 5]] }
     </script>
   </div>
 </body>

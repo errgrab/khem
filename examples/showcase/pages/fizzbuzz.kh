@@ -3,46 +3,37 @@
 page "fizzbuzz" {
   style {
     ".page" {
-      padding 40px
-      max-width 600px
-      margin 0 auto
+      padding: 40px;
+      max-width: 480px;
+      margin: 0 auto;
     }
-    ".back" {
-      display inline-block
-      color var(--fg3)
-      font-size 9px
-      text-transform uppercase
-      letter-spacing 0.08em
-      margin-bottom 24px
+    ".back {
+      display: inline-block;
+      color: var(--fg3);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 20px;
+      text-decoration: none;
     }
-    ".back:hover" { color var(--fg) }
+    ".back:hover" { color: var(--fg); }
     ".title" {
-      font-family var(--serif)
-      font-size 32px
-      margin-bottom 24px
+      font-family: var(--serif);
+      font-size: 28px;
+      margin-bottom: 20px;
     }
-    ".list" {
-      display flex
-      flex-wrap wrap
-      gap 8px
+    ".list { display: flex; flex-wrap: wrap; gap: 6px; }"
+    ".cell" {
+      width: 36px;
+      padding: 6px 2px;
+      text-align: center;
+      font-size: 10px;
+      border: 1px solid var(--border);
+      background: var(--s1);
     }
-    ".fizz" {
-      color var(--green)
-      font-size 11px
-    }
-    ".buzz" {
-      color var(--acc)
-      font-size 11px
-    }
-    ".fizzbuzz" {
-      color var(--amber)
-      font-size 11px
-      font-weight 500
-    }
-    ".num" {
-      color var(--fg2)
-      font-size 11px
-    }
+    ".fizz { color: var(--green); }"
+    ".buzz { color: var(--acc); }"
+    ".fizzbuzz { color: var(--amber); font-weight: 500; }"
   }
 
   div "page" {
@@ -50,36 +41,36 @@ page "fizzbuzz" {
     h1 "title" { text "FizzBuzz (1-30)" }
     
     div "list" {
-      text " 1 "
-      text " 2 "
-      text [concat " " [string toupper "fizz"] " "]
-      text " 4 "
-      text [concat " " [string toupper "buzz"] " "]
-      text [concat " " [string toupper "fizz"] " "]
-      text " 7 "
-      text " 8 "
-      text [concat " " [string toupper "fizz"] " "]
-      text [concat " " [string toupper "buzz"] " "]
-      text " 11 "
-      text [concat " " [string toupper "fizz"] " "]
-      text " 13 "
-      text " 14 "
-      text [concat " " [string toupper "fizzbuzz"] " "]
-      text " 16 "
-      text " 17 "
-      text [concat " " [string toupper "fizz"] " "]
-      text " 19 "
-      text [concat " " [string toupper "buzz"] " "]
-      text [concat " " [string toupper "fizz"] " "]
-      text " 22 "
-      text " 23 "
-      text [concat " " [string toupper "fizz"] " "]
-      text [concat " " [string toupper "buzz"] " "]
-      text " 26 "
-      text [concat " " [string toupper "fizz"] " "]
-      text " 28 "
-      text " 29 "
-      text [concat " " [string toupper "fizzbuzz"] " "]
+      div "cell" { text "1" }
+      div "cell" { text "2" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "4" }
+      div "cell buzz" { text "Buzz" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "7" }
+      div "cell" { text "8" }
+      div "cell fizz" { text "Fizz" }
+      div "cell buzz" { text "Buzz" }
+      div "cell" { text "11" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "13" }
+      div "cell" { text "14" }
+      div "cell fizzbuzz" { text "FizzBuzz" }
+      div "cell" { text "16" }
+      div "cell" { text "17" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "19" }
+      div "cell buzz" { text "Buzz" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "22" }
+      div "cell" { text "23" }
+      div "cell fizz" { text "Fizz" }
+      div "cell buzz" { text "Buzz" }
+      div "cell" { text "26" }
+      div "cell fizz" { text "Fizz" }
+      div "cell" { text "28" }
+      div "cell" { text "29" }
+      div "cell fizzbuzz" { text "FizzBuzz" }
     }
   }
 }

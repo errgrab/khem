@@ -4,23 +4,23 @@ title "Hello"
 page "home" {
   style {
     ".app" {
-      display flex;
-      flex-direction column;
-      align-items center;
-      justify-content center;
-      min-height 100vh;
-      gap 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
     }
     ".title" {
-      font-family var(--serif);
-      font-size 48px;
-      color var(--fg);
+      font-family: var(--serif);
+      font-size: 42px;
+      color: var(--fg);
     }
     ".subtitle" {
-      font-size 9.5px;
-      text-transform uppercase;
-      letter-spacing 0.18em;
-      color var(--fg3);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--fg3);
     }
   }
 

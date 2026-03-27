@@ -1,20 +1,10 @@
-import { parse, ParseError } from "../src/core/parser.js";
+import { parse } from "../src/core/parser.js";
 
 function assertEqual(actual, expected, msg) {
   const actualStr = JSON.stringify(actual);
   const expectedStr = JSON.stringify(expected);
   if (actualStr !== expectedStr) {
     throw new Error(`${msg}: expected ${expectedStr}, got ${actualStr}`);
-  }
-}
-
-function assertThrows(fn, msg) {
-  try {
-    fn();
-    throw new Error(`${msg}: expected to throw`);
-  } catch (e) {
-    if (e.name === "ParseError") return;
-    throw e;
   }
 }
 
@@ -52,12 +42,18 @@ test("parse: command with multiple args", () => {
 
 test("parse: semicolon separator", () => {
   const result = parse("puts a; puts b");
-  assertEqual(result, [["puts", "a"], ["puts", "b"]]);
+  assertEqual(result, [
+    ["puts", "a"],
+    ["puts", "b"],
+  ]);
 });
 
 test("parse: newline separator", () => {
   const result = parse("puts a\nputs b");
-  assertEqual(result, [["puts", "a"], ["puts", "b"]]);
+  assertEqual(result, [
+    ["puts", "a"],
+    ["puts", "b"],
+  ]);
 });
 
 test("parse: comment ignored", () => {
@@ -87,7 +83,9 @@ test("parse: command substitution", () => {
 
 test("parse: nested command substitution", () => {
   const result = parse("puts [concat [expr 1] [expr 2]]");
-  assertEqual(result, [["puts", [["concat", [["expr", "1"]], [["expr", "2"]]]]]]);
+  assertEqual(result, [
+    ["puts", [["concat", [["expr", "1"]], [["expr", "2"]]]]],
+  ]);
 });
 
 test("parse: variable substitution in string", () => {
@@ -102,7 +100,11 @@ test("parse: braces preserve literal (no substitution)", () => {
 
 test("parse: multiple commands", () => {
   const result = parse("set x 1\nset y 2\nset z 3");
-  assertEqual(result, [["set", "x", "1"], ["set", "y", "2"], ["set", "z", "3"]]);
+  assertEqual(result, [
+    ["set", "x", "1"],
+    ["set", "y", "2"],
+    ["set", "z", "3"],
+  ]);
 });
 
 test("parse: word with underscore", () => {
@@ -122,7 +124,10 @@ test("parse: empty command", () => {
 
 test("parse: multiple semicolons", () => {
   const result = parse("puts a;;;puts b");
-  assertEqual(result, [["puts", "a"], ["puts", "b"]]);
+  assertEqual(result, [
+    ["puts", "a"],
+    ["puts", "b"],
+  ]);
 });
 
 test("parse: quoted string with escaped quote", () => {
@@ -137,7 +142,9 @@ test("parse: proc definition", () => {
 
 test("parse: if/else", () => {
   const result = parse("if $x > 0 { puts positive } else { puts negative }");
-  assertEqual(result, [["if", "$x", ">", "0", "puts positive", "else", "puts negative"]]);
+  assertEqual(result, [
+    ["if", "$x", ">", "0", "puts positive", "else", "puts negative"],
+  ]);
 });
 
 test("parse: for loop", () => {
@@ -151,8 +158,16 @@ test("parse: foreach loop", () => {
 });
 
 test("parse: match command", () => {
-  const result = parse('match $x { "hello" { puts greeting } "bye" { puts farewell } default { puts other } }');
-  assertEqual(result, [["match", "$x", '"hello" { puts greeting } "bye" { puts farewell } default { puts other }']]);
+  const result = parse(
+    'match $x { "hello" { puts greeting } "bye" { puts farewell } default { puts other } }',
+  );
+  assertEqual(result, [
+    [
+      "match",
+      "$x",
+      '"hello" { puts greeting } "bye" { puts farewell } default { puts other }',
+    ],
+  ]);
 });
 
 test("parse: list command", () => {
@@ -176,8 +191,12 @@ test("parse: expr with operators", () => {
 });
 
 test("parse: nested braces", () => {
-  const result = parse("proc test { a } { if $a { puts yes } else { puts no } }");
-  assertEqual(result, [["proc", "test", "a", "if $a { puts yes } else { puts no }"]]);
+  const result = parse(
+    "proc test { a } { if $a { puts yes } else { puts no } }",
+  );
+  assertEqual(result, [
+    ["proc", "test", "a", "if $a { puts yes } else { puts no }"],
+  ]);
 });
 
 test("parse: empty block", () => {

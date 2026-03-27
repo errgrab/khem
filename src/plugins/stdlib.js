@@ -1,4 +1,4 @@
-import { evaluate, sub, createScope } from "../core/engine.js";
+import { createScope, evaluate } from "../core/engine.js";
 import { parse } from "../core/parser.js";
 
 const truthy = (v) => v && v !== "0" && v !== "false";
@@ -19,46 +19,53 @@ export function loadStdLib(env) {
     return null;
   };
 
-  c["if"] = (args, scope, env) => {
+  c["if"] = (args, scope) => {
     const [condition, trueBlock, elseKeyword, falseBlock] = args;
     if (truthy(condition)) return evaluate(parse(trueBlock), scope, env);
-    if (elseKeyword === "else" && falseBlock) return evaluate(parse(falseBlock), scope, env);
+    if (elseKeyword === "else" && falseBlock)
+      return evaluate(parse(falseBlock), scope, env);
     return null;
   };
 
-  c["for"] = (args, scope, env) => {
+  c["for"] = (args, scope) => {
     const [varName, start, end, body] = args;
     const outputs = [];
     const bodyCmds = parse(body);
     for (let i = num(start); i <= num(end); i++) {
-      const local = { vars: { ...scope.vars, [varName]: String(i) }, parent: scope.parent };
+      const local = {
+        vars: { ...scope.vars, [varName]: String(i) },
+        parent: scope.parent,
+      };
       outputs.push(...evaluate(bodyCmds, local, env));
     }
     return outputs;
   };
 
-  c["foreach"] = (args, scope, env) => {
+  c["foreach"] = (args, scope) => {
     const [varName, listStr, body] = args;
     const items = String(listStr).split(/\s+/).filter(Boolean);
     const bodyCmds = parse(body);
     const outputs = [];
     for (const item of items) {
-      const local = { vars: { ...scope.vars, [varName]: item }, parent: scope.parent };
+      const local = {
+        vars: { ...scope.vars, [varName]: item },
+        parent: scope.parent,
+      };
       outputs.push(...evaluate(bodyCmds, local, env));
     }
     return outputs;
   };
 
-  c["proc"] = (args, scope) => {
+  c["proc"] = (args) => {
     const [name, rawParams, bodyStr] = args;
     let params = [];
-    
+
     if (typeof rawParams === "string") {
       params = rawParams.split(/\s+/).filter(Boolean);
     } else if (Array.isArray(rawParams) && rawParams.length > 0) {
       const inner = rawParams[0];
       if (Array.isArray(inner)) {
-        params = inner.map(p => Array.isArray(p) ? p[0] : p);
+        params = inner.map((p) => (Array.isArray(p) ? p[0] : p));
       } else {
         params = rawParams;
       }
@@ -67,9 +74,11 @@ export function loadStdLib(env) {
     // Parse the body string into commands
     const body = parse(bodyStr);
 
-    c[name] = (callArgs, callScope, env) => {
+    c[name] = (callArgs, callScope) => {
       const local = { vars: { ...callScope.vars }, parent: callScope.parent };
-      params.forEach((p, i) => { local.vars[p] = callArgs[i] ?? ""; });
+      params.forEach((p, i) => {
+        local.vars[p] = callArgs[i] ?? "";
+      });
       return evaluate(body, local, env);
     };
     return null;
@@ -79,9 +88,11 @@ export function loadStdLib(env) {
 
   c["list"] = (args) => args.join(" ");
   c["llength"] = (args) => args[0].split(/\s+/).filter(Boolean).length;
-  c["lindex"] = (args) => args[0].split(/\s+/).filter(Boolean)[num(args[1])] ?? "";
+  c["lindex"] = (args) =>
+    args[0].split(/\s+/).filter(Boolean)[num(args[1])] ?? "";
   c["lappend"] = (args, scope) => {
-    scope.vars[args[0]] = (scope.vars[args[0]] || "") + " " + args.slice(1).join(" ");
+    scope.vars[args[0]] =
+      (scope.vars[args[0]] || "") + " " + args.slice(1).join(" ");
     return null;
   };
   c["concat"] = (args) => args.join(" ");
@@ -97,12 +108,17 @@ export function loadStdLib(env) {
   c["expr"] = (args, scope) => {
     let expr = args.join(" ");
     expr = expr.replace(/==/g, "===").replace(/!=/g, "!==");
-    try { return String(new Function("return " + expr)()); } 
-    catch { return "0"; }
+    try {
+      return String(new Function("return " + expr)());
+    } catch {
+      return "0";
+    }
   };
 
   c["incr"] = (args, scope) => {
-    scope.vars[args[0]] = String(num(scope.vars[args[0]] || 0) + num(args[1] || 1));
+    scope.vars[args[0]] = String(
+      num(scope.vars[args[0]] || 0) + num(args[1] || 1),
+    );
     return scope.vars[args[0]];
   };
 
@@ -117,38 +133,46 @@ export function loadStdLib(env) {
   c["string"] = (args) => {
     const [op, str, ...rest] = args;
     switch (op) {
-      case "length": return String(str.length);
-      case "index": return str[num(rest[0])] || "";
-      case "range": return str.slice(num(rest[0]), rest[1] ? num(rest[1]) + 1 : undefined);
-      case "trim": return str.trim();
-      case "toupper": return str.toUpperCase();
-      case "tolower": return str.toLowerCase();
+      case "length":
+        return String(str.length);
+      case "index":
+        return str[num(rest[0])] || "";
+      case "range":
+        return str.slice(num(rest[0]), rest[1] ? num(rest[1]) + 1 : undefined);
+      case "trim":
+        return str.trim();
+      case "toupper":
+        return str.toUpperCase();
+      case "tolower":
+        return str.toLowerCase();
       case "match": {
         const re = new RegExp(rest[0].replace(/\*/g, ".*").replace(/\?/g, "."));
         return re.test(str) ? "1" : "0";
       }
-      default: return "";
+      default:
+        return "";
     }
   };
 
-  c["eq"] = (args) => args[0] === args[1] ? "1" : "0";
-  c["neq"] = (args) => args[0] !== args[1] ? "1" : "0";
-  c["gt"] = (args) => num(args[0]) > num(args[1]) ? "1" : "0";
-  c["lt"] = (args) => num(args[0]) < num(args[1]) ? "1" : "0";
-  c["gte"] = (args) => num(args[0]) >= num(args[1]) ? "1" : "0";
-  c["lte"] = (args) => num(args[0]) <= num(args[1]) ? "1" : "0";
-  c["not"] = (args) => truthy(args[0]) ? "0" : "1";
-  c["and"] = (args) => truthy(args[0]) && truthy(args[1]) ? "1" : "0";
-  c["or"] = (args) => truthy(args[0]) || truthy(args[1]) ? "1" : "0";
+  c["eq"] = (args) => (args[0] === args[1] ? "1" : "0");
+  c["neq"] = (args) => (args[0] !== args[1] ? "1" : "0");
+  c["gt"] = (args) => (num(args[0]) > num(args[1]) ? "1" : "0");
+  c["lt"] = (args) => (num(args[0]) < num(args[1]) ? "1" : "0");
+  c["gte"] = (args) => (num(args[0]) >= num(args[1]) ? "1" : "0");
+  c["lte"] = (args) => (num(args[0]) <= num(args[1]) ? "1" : "0");
+  c["not"] = (args) => (truthy(args[0]) ? "0" : "1");
+  c["and"] = (args) => (truthy(args[0]) && truthy(args[1]) ? "1" : "0");
+  c["or"] = (args) => (truthy(args[0]) || truthy(args[1]) ? "1" : "0");
 
   c["replace"] = (args) => args[0].replaceAll(args[1], args[2]);
   c["trim"] = (args) => args[0].trim();
   c["upper"] = (args) => args[0].toUpperCase();
   c["lower"] = (args) => args[0].toLowerCase();
-  c["slice"] = (args) => args[0].slice(num(args[1]), args[2] ? num(args[2]) : undefined);
-  c["contains"] = (args) => args[0].includes(args[1]) ? "1" : "0";
-  c["starts-with"] = (args) => args[0].startsWith(args[1]) ? "1" : "0";
-  c["ends-with"] = (args) => args[0].endsWith(args[1]) ? "1" : "0";
+  c["slice"] = (args) =>
+    args[0].slice(num(args[1]), args[2] ? num(args[2]) : undefined);
+  c["contains"] = (args) => (args[0].includes(args[1]) ? "1" : "0");
+  c["starts-with"] = (args) => (args[0].startsWith(args[1]) ? "1" : "0");
+  c["ends-with"] = (args) => (args[0].endsWith(args[1]) ? "1" : "0");
 
   c["today"] = () => new Date().toISOString().slice(0, 10);
   c["clock"] = (args) => {
@@ -156,12 +180,12 @@ export function loadStdLib(env) {
     return new Date().toLocaleString();
   };
 
-  c["match"] = (args, scope, env) => {
+  c["match"] = (args, scope) => {
     const target = args[0];
-    
+
     // Handle different argument formats
     let clauses = [];
-    
+
     if (args.length === 2 && typeof args[1] === "string") {
       // match $x "{ 1 {...} 2 {...} }" - parse the string
       const clauseStr = args[1];
@@ -171,9 +195,9 @@ export function loadStdLib(env) {
         // Skip whitespace
         while (i < clauseStr.length && /\s/.test(clauseStr[i])) i++;
         if (i >= clauseStr.length) break;
-        
+
         // Get pattern (may be quoted)
-        let pattern = '';
+        let pattern = "";
         if (clauseStr[i] === '"') {
           i++; // skip opening quote
           while (i < clauseStr.length && clauseStr[i] !== '"') {
@@ -187,17 +211,21 @@ export function loadStdLib(env) {
             i++;
           }
         }
-        
+
         // Skip whitespace
         while (i < clauseStr.length && /\s/.test(clauseStr[i])) i++;
-        
+
         // Get body in braces
-        if (clauseStr[i] === '{') {
+        if (clauseStr[i] === "{") {
           i++;
-          let depth = 1, body = '';
+          let depth = 1,
+            body = "";
           while (i < clauseStr.length && depth > 0) {
-            if (clauseStr[i] === '{') depth++;
-            if (clauseStr[i] === '}') { depth--; if (depth === 0) break; }
+            if (clauseStr[i] === "{") depth++;
+            if (clauseStr[i] === "}") {
+              depth--;
+              if (depth === 0) break;
+            }
             body += clauseStr[i];
             i++;
           }
@@ -214,35 +242,45 @@ export function loadStdLib(env) {
         }
       }
     }
-    
+
     let fallback = null;
     for (const [pattern, bodyStr] of clauses) {
       const body = parse(bodyStr);
-      if (pattern === "default") { fallback = body; continue; }
+      if (pattern === "default") {
+        fallback = body;
+        continue;
+      }
       if (pattern === target) return evaluate(body, scope, env);
     }
     return fallback ? evaluate(fallback, scope, env) : null;
   };
 
-  c["try"] = (args, scope, env) => {
-    try { return evaluate(parse(args[0]), scope, env); }
-    catch (e) {
+  c["try"] = (args, scope) => {
+    try {
+      return evaluate(parse(args[0]), scope, env);
+    } catch (e) {
       if (args[1] === "catch" && args[2]) {
-        const catchScope = { vars: { ...scope.vars, error: e.message }, parent: scope.parent };
+        const catchScope = {
+          vars: { ...scope.vars, error: e.message },
+          parent: scope.parent,
+        };
         return evaluate(parse(args[2]), catchScope, env);
       }
       throw e;
     }
   };
 
-  c["throw"] = (args) => { throw new Error(args[0]); };
+  c["throw"] = (args) => {
+    throw new Error(args[0]);
+  };
 
   c["dict"] = (args) => {
     const [op, ...rest] = args;
     switch (op) {
       case "create": {
         const pairs = [];
-        for (let i = 0; i < rest.length; i += 2) pairs.push(rest[i], rest[i + 1] || "");
+        for (let i = 0; i < rest.length; i += 2)
+          pairs.push(rest[i], rest[i + 1] || "");
         return pairs.join(" ");
       }
       case "get": {
@@ -254,15 +292,21 @@ export function loadStdLib(env) {
       }
       case "set": {
         const items = rest[0] ? rest[0].split(/\s+/) : [];
-        const key = rest[1], val = rest[2];
+        const key = rest[1],
+          val = rest[2];
         let found = false;
         for (let i = 0; i < items.length; i += 2) {
-          if (items[i] === key) { items[i + 1] = val; found = true; break; }
+          if (items[i] === key) {
+            items[i + 1] = val;
+            found = true;
+            break;
+          }
         }
         if (!found) items.push(key, val);
         return items.join(" ");
       }
-      default: return "";
+      default:
+        return "";
     }
   };
 }
