@@ -11,15 +11,16 @@ export function createEnvironment(webMode = false) {
 }
 
 export function run(code, env = createEnvironment()) {
-  const scope = { vars: env.vars, parent: null };
-  return evaluate(parse(code), scope, env).join("");
+  return evaluate(parse(code), { vars: env.vars, parent: null }, env).join("");
 }
 
 export function renderForWeb(code, baseDir) {
   const env = createEnvironment(true);
   if (baseDir) env._baseDir = baseDir;
-  evaluate(parse(code), { vars: env.vars, parent: null }, env);
-  return generateHTML(env);
+  const scope = { vars: env.vars, parent: null };
+  const result = evaluate(parse(code), scope, env).join("");
+  const html = generateHTML(env);
+  return html && html.trim() ? html : result;
 }
 
 export function processScriptTags(html) {

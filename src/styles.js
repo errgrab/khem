@@ -111,7 +111,7 @@ select.field { cursor: pointer; }
 }
 .toast {
   border: 1px solid var(--green-dim);
-  background: #0e1a10;
+  background: var(--green-dim);
   color: var(--green);
   padding: 6px 10px;
   display: inline-flex;

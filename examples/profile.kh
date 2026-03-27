@@ -1,0 +1,9 @@
+document "Profile" {
+    set name "Ada Lovelace"
+    set role "Mathematician"
+    set year "1843"
+
+    h1 { text $name }
+    p { text $role }
+    p { text [concat "Active since " $year] }
+}

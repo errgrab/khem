@@ -4,8 +4,12 @@ import path from "node:path";
 import http from "node:http";
 import readline from "node:readline";
 import { spawn } from "node:child_process";
-import { parse } from "../src/core/parser.js";
-import { run, createEnvironment, processScriptTags } from "../src/index.js";
+import {
+  run,
+  renderForWeb,
+  createEnvironment,
+  processScriptTags,
+} from "../src/index.js";
 
 const [, , cmd, ...args] = process.argv;
 
@@ -15,7 +19,7 @@ const printError = (error, file = "<stdin>") => {
 
 const isWebFile = (code) => {
   return (
-    /^\s*(page|route|state|title)\s/m.test(code) ||
+    /^\s*(document|page|route|state|title)\s/m.test(code) ||
     code.includes('<script type="text/khem">')
   );
 };
@@ -27,7 +31,7 @@ const compileFile = (filePath, forceWeb = false) => {
 
   // Check if it's a web file or forced web mode
   if (forceWeb || isWebFile(code)) {
-    return runForWeb(code, undefined, baseDir);
+    return renderForWeb(code, baseDir);
   }
 
   // Check if it's an HTML file with khem script tags
