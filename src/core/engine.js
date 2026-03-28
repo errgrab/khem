@@ -1,7 +1,4 @@
-export const createScope = (parent = null) => ({
-  vars: { ...(parent?.vars || {}) },
-  parent,
-});
+export const createScope = (parent = null) => ({ vars: {}, parent });
 
 export const lookup = (scope, name) => {
   let s = scope;

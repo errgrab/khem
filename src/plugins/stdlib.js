@@ -31,13 +31,13 @@ export function loadStdLib(env) {
     const [varName, start, end, body] = args;
     const outputs = [];
     const bodyCmds = parse(body);
+    const old = scope.vars[varName];
     for (let i = num(start); i <= num(end); i++) {
-      const local = {
-        vars: { ...scope.vars, [varName]: String(i) },
-        parent: scope.parent,
-      };
-      outputs.push(...evaluate(bodyCmds, local, env));
+      scope.vars[varName] = String(i);
+      outputs.push(...evaluate(bodyCmds, scope, env));
     }
+    if (old !== undefined) scope.vars[varName] = old;
+    else delete scope.vars[varName];
     return outputs;
   };
 
@@ -46,40 +46,39 @@ export function loadStdLib(env) {
     const items = String(listStr).split(/\s+/).filter(Boolean);
     const bodyCmds = parse(body);
     const outputs = [];
+    const old = scope.vars[varName];
     for (const item of items) {
-      const local = {
-        vars: { ...scope.vars, [varName]: item },
-        parent: scope.parent,
-      };
+      scope.vars[varName] = item;
       outputs.push(...evaluate(bodyCmds, local, env));
     }
+    if (old !== undefined) scope.vars[varName] = old;
+    else delete scope.vars[varName];
     return outputs;
   };
 
   c["proc"] = (args) => {
     const [name, rawParams, bodyStr] = args;
-    let params = [];
-
-    if (typeof rawParams === "string") {
-      params = rawParams.split(/\s+/).filter(Boolean);
-    } else if (Array.isArray(rawParams) && rawParams.length > 0) {
-      const inner = rawParams[0];
-      if (Array.isArray(inner)) {
-        params = inner.map((p) => (Array.isArray(p) ? p[0] : p));
-      } else {
-        params = rawParams;
-      }
-    }
-
-    // Parse the body string into commands
     const body = parse(bodyStr);
-
+    const params = parse(paramsStr).map((p) =>
+      typeof p === "string"
+        ? { name: p, default: null }
+        : { name: p[0], default: p[1] ?? null },
+    );
     c[name] = (callArgs, callScope) => {
-      const local = { vars: { ...callScope.vars }, parent: callScope.parent };
-      params.forEach((p, i) => {
-        local.vars[p] = callArgs[i] ?? "";
-      });
-      return evaluate(body, local, env);
+      const local = createScope(callScope);
+      let argIndex = 0;
+      for (const p of params) {
+        const value =
+          argIndex < callArgs.length
+            ? callArgs[argIndex++]
+            : (param.default ?? "");
+        local.vars[p.name] = value;
+      }
+      const result = evaluate(body, local, env);
+      if (result.length > 0 && result[0]?.__khemReturn) {
+        return [result[0].value ?? ""];
+      }
+      return result;
     };
     return null;
   };
