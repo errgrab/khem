@@ -1,8 +1,27 @@
 import { parse } from "../core/parser.js";
 import { evaluate } from "../core/engine.js";
 import { DEFAULT_CSS, GOOGLE_FONTS } from "../styles.js";
-import fs from "node:fs";
-import path from "node:path";
+
+let _fs = null;
+let _path = null;
+
+function isNode() {
+  return (
+    typeof process !== "undefined" &&
+    process.versions != null &&
+    process.versions.node != null
+  );
+}
+
+if (isNode()) {
+  Promise.all([
+    import("node:fs").catch(() => null),
+    import("node:path").catch(() => null),
+  ]).then(([fsMod, pathMod]) => {
+    if (fsMod) _fs = fsMod.default ?? fsMod;
+    if (pathMod) _path = pathMod.default ?? pathMod;
+  });
+}
 
 export function runWeb(code, env) {
   const scope = { vars: env.vars, parent: null };
@@ -77,17 +96,26 @@ export function loadWebLib(env) {
 
   c["include"] = ([file], scope) => {
     if (!file) return;
-
+    if (!isNode()) {
+      console.warn(
+        `include "${file}" skipped — filesystem not available in browser`,
+      );
+      return;
+    }
+    if (!_fs || !_path) {
+      console.error(
+        `include "${file}" skipped — Node builtins not yet initialised`,
+      );
+      return;
+    }
     const base = env._baseDir ?? process.cwd();
-    const abs = path.resolve(base, file);
+    const abs = _path.resolve(base, file);
     if (ctx.includes.has(abs)) return;
-
     ctx.includes.add(abs);
-
     const prev = env._baseDir;
     try {
-      env._baseDir = path.dirname(abs);
-      renderWeb(fs.readFileSync(abs, "utf8"), scope, env);
+      env._baseDir = _path.dirname(abs);
+      renderWeb(_fs.readFileSync(abs, "utf8"), scope, env);
     } catch (e) {
       console.error(`include error: ${e.message}`);
     } finally {
@@ -144,7 +172,6 @@ export function loadWebLib(env) {
     let id = "",
       cls = "field",
       attrsStr = "";
-
     if (args.length === 1) {
       attrsStr = args[0];
     } else if (args.length === 2) {
@@ -155,18 +182,12 @@ export function loadWebLib(env) {
       cls = args[1];
       attrsStr = args[2];
     }
-
     const parsedAttrs = attrsStr
       ? parse(attrsStr)
           .map(([k, ...v]) => (v.length ? `${k}="${v.join(" ")}"` : k))
           .join(" ")
       : "";
-
-    const idAttr = id ? ` id="${id}"` : "";
-    const clsAttr = cls ? ` class="${cls}"` : "";
-    const extraAttrs = parsedAttrs ? ` ${parsedAttrs}` : "";
-
-    return `<input${idAttr}${clsAttr}${extraAttrs}>`;
+    return `<input${id ? ` id="${id}"` : ""}${cls ? ` class="${cls}"` : ""}${parsedAttrs ? ` ${parsedAttrs}` : ""}>`;
   };
 
   c["br"] = () => "<br>";
@@ -187,19 +208,16 @@ export function generateHTML(env) {
   const defaultPage = ctx.routes["#/"] ?? pageNames[0];
   const initial = pages[defaultPage] ?? "";
 
-  // Only include routing if there are multiple pages
   const needsRouting = pageNames.length > 1;
   const routingJS = needsRouting
     ? `
-    var T = ${JSON.stringify(pages)};
-    var R = ${JSON.stringify(ctx.routes)};
-    function route() {
-      var page = R[location.hash || "#/"] || Object.keys(T)[0];
-      if (page && T[page]) document.getElementById("app").innerHTML = T[page];
+    var T=${JSON.stringify(pages)};
+    var R=${JSON.stringify(ctx.routes)};
+    function route(){
+      var p=R[location.hash||"#/"]||Object.keys(T)[0];
+      if(p&&T[p])document.getElementById("app").innerHTML=T[p];
     }
-    window.addEventListener("hashchange", route);
-    route();
-  `
+    window.addEventListener("hashchange",route);route();`
     : "";
 
   const userStyles = ctx.styles.join("\n");
@@ -222,7 +240,7 @@ export function generateHTML(env) {
   <script>
     ${routingJS}
     ${userScripts}
-  </script>
+  <\/script>
 </body>
 </html>`;
 }
