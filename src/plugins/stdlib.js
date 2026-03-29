@@ -49,7 +49,7 @@ export function loadStdLib(env) {
     const old = scope.vars[varName];
     for (const item of items) {
       scope.vars[varName] = item;
-      outputs.push(...evaluate(bodyCmds, local, env));
+      outputs.push(...evaluate(bodyCmds, scope, env));
     }
     if (old !== undefined) scope.vars[varName] = old;
     else delete scope.vars[varName];
@@ -59,7 +59,7 @@ export function loadStdLib(env) {
   c["proc"] = (args) => {
     const [name, rawParams, bodyStr] = args;
     const body = parse(bodyStr);
-    const params = parse(paramsStr).map((p) =>
+    const params = parse(rawParams).map((p) =>
       typeof p === "string"
         ? { name: p, default: null }
         : { name: p[0], default: p[1] ?? null },
@@ -258,13 +258,13 @@ export function loadStdLib(env) {
     try {
       return evaluate(parse(args[0]), scope, env);
     } catch (e) {
+      const oldError = scope.vars["error"];
       if (args[1] === "catch" && args[2]) {
-        const catchScope = {
-          vars: { ...scope.vars, error: e.message },
-          parent: scope.parent,
-        };
-        return evaluate(parse(args[2]), catchScope, env);
+        scope.vars["error"] = e.message;
+        return evaluate(parse(args[2]), scope, env);
       }
+      if (oldError !== undefined) scope.vars["error"] = oldError;
+      else delete scope.vars["error"];
       throw e;
     }
   };

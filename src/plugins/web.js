@@ -80,9 +80,24 @@ export function loadWebLib(env) {
   c["route"] = ([path, page]) => {
     ctx.routes[path] = page;
   };
-  c["style"] = ([s]) => {
-    if (s) ctx.styles.push(s);
+
+  c["style"] = ([src]) => {
+    if (!src) return;
+    const evalScope = { vars: { ...env.vars }, parent: null };
+    const ev = (t) =>
+      Array.isArray(t) ? evaluate(t, evalScope, env).join("") : String(t);
+    const fmt = (cmds, ind = "") =>
+      parse(cmds)
+        .map((cmd) => {
+          const last = cmd[cmd.length - 1];
+          if (typeof last === "string" && /[;\n]/.test(last))
+            return `${ind}${cmd.slice(0, -1).map(ev).join(" ")} { \n${fmt(last, ind + "  ")}${ind}}`;
+          return `${ind}${ev(cmd[0])}: ${cmd.slice(1).map(ev).join(" ")};`;
+        })
+        .join("\n") + "\n";
+    ctx.styles.push(fmt(src));
   };
+
   c["script"] = ([s]) => {
     if (s) ctx.scripts.push(s);
   };
@@ -98,13 +113,13 @@ export function loadWebLib(env) {
     if (!file) return;
     if (!isNode()) {
       console.warn(
-        `include "${file}" skipped — filesystem not available in browser`,
+        `include \"${file}\" skipped — filesystem not available in browser`,
       );
       return;
     }
     if (!_fs || !_path) {
       console.error(
-        `include "${file}" skipped — Node builtins not yet initialised`,
+        `include \"${file}\" skipped — Node builtins not yet initialised`,
       );
       return;
     }

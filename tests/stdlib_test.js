@@ -70,14 +70,13 @@ test("if: else with condition", () => {
 test("for: basic counting loop", () => {
   const env = createEnvironment();
   run("set total 0\nfor i 1 3 { incr total $i }", env);
-  //assertEqual(env.vars.total, "6", "for loop counting"); // there is scope inside for, so...
+  assertEqual(env.vars.total, "6", "for loop counting");
 });
 
 test("for: loop variable scope", () => {
   const env = createEnvironment();
   run("set total 0\nfor i 1 3 { incr total $i }", env);
-  // Note: for loop creates new scope, so total stays 0
-  // This is expected behavior per current implementation
+  assertEqual(env.vars.total, "6", "for loop variable scope");
 });
 
 // foreach loop
@@ -85,6 +84,9 @@ test("foreach: iterate list", () => {
   // foreach runs but puts outputs to console
   const env = createEnvironment();
   run('foreach item "a b c" { set $item true }', env);
+  assertEqual(env.vars.a, "true", "foreach item a");
+  assertEqual(env.vars.b, "true", "foreach item b");
+  assertEqual(env.vars.c, "true", "foreach item c");
 });
 
 // match (pattern matching)
@@ -125,7 +127,7 @@ test("proc: with return value", () => {
 
 test("proc: parameter passing", () => {
   const env = createEnvironment();
-  run("proc add { a b } { return [expr $a + $b] }", env);
+  run("proc add { a; b } { return [expr $a + $b] }", env);
   run("set result [add 3 7]", env);
   assertEqual(env.vars.result, "10", "proc parameters");
 });
@@ -427,34 +429,37 @@ test("try: successful try", () => {
 
 test("try: catch error", () => {
   const env = createEnvironment();
-  const result = run('try { throw "oops" } catch { set caught true }', env);
-  // assertEqual(env.vars.caught, "true", "try catch error"); // scope problems again... hm...
+  const result = run(
+    'set caught false;try { throw "oops" } catch { set caught true }',
+    env,
+  );
+  assertEqual(env.vars.caught, "true", "try catch error");
 });
 
 // Truthiness
 console.log("\n--- Truthiness ---\n");
 test("truthy: non-zero number", () => {
   const env = createEnvironment();
-  const result = run("if 1 { set yes true } else { set yes false }");
-  // assertEqual(env.vars.yes, "true", "non-zero is truthy"); // scope problems
+  const result = run("set yes no; if 1 { set yes yes }", env);
+  assertEqual(env.vars.yes, "yes", "non - zero is truthy");
 });
 
 test("truthy: zero is falsy", () => {
   const env = createEnvironment();
   run("set x 0\nif $x { set result yes } else { set result no }", env);
-  assertEqual(env.vars.result, "no", "zero is falsy"); // scope problems, this test is not useful
+  assertEqual(env.vars.result, "no", "zero is falsy");
 });
 
 test("truthy: 'false' string is falsy", () => {
   const env = createEnvironment();
   run('set x "false"\nif $x { set result yes } else { set result no }', env);
-  assertEqual(env.vars.result, "no", "false string is falsy"); // this test is not useful due to scope issues
+  assertEqual(env.vars.result, "no", "false string is falsy");
 });
 
 test("truthy: empty string is falsy", () => {
   const env = createEnvironment();
   run('set x ""\nif $x { set result yes } else { set result no }', env);
-  assertEqual(env.vars.result, "no", "empty string is falsy"); // this test is not useful due to scope issues
+  assertEqual(env.vars.result, "no", "empty string is falsy");
 });
 
 // Miscellaneous

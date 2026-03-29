@@ -4,6 +4,7 @@ import path from "node:path";
 import http from "node:http";
 import readline from "node:readline";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   run,
   renderForWeb,
@@ -153,6 +154,102 @@ const serveFile = (filePath, port = 4173, forceWeb = false) => {
   });
 };
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".htm": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".svg": "image/svg+xml; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".ttf": "font/ttf",
+  ".map": "application/octet-stream",
+};
+
+function serveStaticDir(dirPath, port = 4173, host = "127.0.0.1", open = true) {
+  const root = path.resolve(dirPath);
+
+  const server = http.createServer((req, res) => {
+    const urlPath = decodeURIComponent(req.url.split("?")[0]);
+    let filePath = urlPath === "/" ? "/ide.html" : urlPath;
+    const safePath = path.normalize(path.join(root, filePath));
+    if (!safePath.startsWith(root)) {
+      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Forbidden");
+      return;
+    }
+
+    fs.stat(safePath, (err, stat) => {
+      if (err) {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Not found");
+        return;
+      }
+      if (stat.isDirectory()) {
+        const index = path.join(safePath, "index.html");
+        if (fs.existsSync(index)) {
+          serveFileContent(index, res);
+          return;
+        }
+        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Forbidden");
+        return;
+      }
+      serveFileContent(safePath, res);
+    });
+  });
+
+  function serveFileContent(absPath, res) {
+    const ext = path.extname(absPath).toLowerCase();
+    const type = MIME[ext] || "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": type,
+      "Cache-Control": "no-cache",
+    });
+    const stream = fs.createReadStream(absPath);
+    stream.pipe(res);
+    stream.on("error", () => {
+      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Server error");
+    });
+  }
+
+  server.listen(port, host, () => {
+    const url = `http://${host}:${port}/ide.html`;
+    console.log(`[khem] static server serving ${root} at ${url}`);
+    if (open) {
+      const opener =
+        process.platform === "darwin"
+          ? "open"
+          : process.platform === "win32"
+            ? "start"
+            : "xdg-open";
+      try {
+        if (process.platform === "win32") {
+          spawn("cmd", ["/c", "start", "", url], {
+            stdio: "ignore",
+            detached: true,
+          });
+        } else {
+          spawn(opener, [url], { stdio: "ignore", detached: true }).unref();
+        }
+      } catch (e) {
+        // Ignore errors from trying to open the browser
+      }
+    }
+  });
+}
+
 const runTestSuite = () => {
   const nodeSuite = spawn(process.execPath, ["tests/node_test.js"], {
     stdio: "inherit",
@@ -212,6 +309,13 @@ if (cmd === "test") {
   }
   const forceWeb = args.includes("--web");
   serveFile(target, Number.isFinite(portArg) ? portArg : 4173, forceWeb);
+} else if (cmd === "ide") {
+  // Serve IDE and repository static files.
+  // Usage: khem ide [dir] [port]
+  // If dir omitted, serve package root (one level up from this bin file)
+  const dir = args[0] ? path.resolve(args[0]) : path.resolve(__dirname, "..");
+  const portArg = Number(args[1] ?? 4173);
+  serveStaticDir(dir, Number.isFinite(portArg) ? portArg : 4173);
 } else if (cmd === "run") {
   // Quick run a file
   const target = args[0];
@@ -234,6 +338,7 @@ if (cmd === "test") {
   khem build <file.kh> --web  Force web mode
   khem watch <file.kh>      Watch and rebuild
   khem serve <file.kh> [port] Serve with live reload
+  khem ide [dir] [port]     Serve the IDE (open /ide.html)
   khem repl                 Interactive REPL
   khem test                 Run tests`);
 }
