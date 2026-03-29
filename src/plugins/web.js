@@ -48,17 +48,36 @@ const renderWeb = (src, scope, env) => {
   return evaluate(parse(src), scope, env).join("");
 };
 
-function tagArgs(args, scope, env) {
-  if (args.length < 1 || args.length > 2)
-    throw new Error("tag expects 1 or 2 arguments");
+function renderArg(arg, scope, env) {
+  if (Array.isArray(arg)) {
+    // Could be a parsed command list [[cmd, ...], ...] or a single command [cmd, ...]
+    // If first element is a string, it's a single command
+    if (arg.length > 0 && typeof arg[0] === "string") {
+      return evaluate([arg], scope, env).join("");
+    }
+    // Otherwise it's a list of commands
+    return evaluate(arg, scope, env).join("");
+  }
+  if (typeof arg === "string") return renderWeb(arg, scope, env);
+  return String(arg ?? "");
+}
 
-  const hasClass = args.length === 2;
-  const className = hasClass ? args[0] : "";
-  const bodyRaw = hasClass ? args[1] : args[0];
+function tagArgs(args, scope, env) {
+  if (args.length === 0)
+    throw new Error("tag expects at least 1 argument");
+
+  // First arg is class if it's a string and there are more args
+  const firstIsClass =
+    typeof args[0] === "string" && args.length > 1 && !Array.isArray(args[0]);
+
+  const className = firstIsClass ? args[0] : "";
+  const bodyArgs = firstIsClass ? args.slice(1) : args;
+
+  const body = bodyArgs.map((a) => renderArg(a, scope, env)).join("");
 
   return {
     cls: className ? ` class="${className}"` : "",
-    body: renderWeb(bodyRaw, scope, env),
+    body,
   };
 }
 
