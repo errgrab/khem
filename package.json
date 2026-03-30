@@ -7,6 +7,7 @@
     "example": "examples"
   },
   "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --outfile=khem.js --minify",
     "test": "node tests/parser_test.js && node tests/stdlib_test.js && node tests/web_test.js",
     "repl": "node bin/khem.js repl",
     "watch": "node bin/khem.js watch",
@@ -26,5 +27,8 @@
   "bugs": {
     "url": "https://github.com/errgrab/khem/issues"
   },
-  "homepage": "https://github.com/errgrab/khem#readme"
+  "homepage": "https://github.com/errgrab/khem#readme",
+  "devDependencies": {
+    "esbuild": "^0.27.4"
+  }
 }

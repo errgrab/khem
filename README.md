@@ -58,7 +58,7 @@ Khem is designed for the modern web. You can import the compiler directly into y
 
 ```html
 <script type="module">
-  import { createEnvironment, run } from './src/index.js';
+  import { createEnvironment, run } from 'https://khem.erikg.org/khem.js';
 
   const code = `
     document "My App" {
@@ -72,6 +72,18 @@ Khem is designed for the modern web. You can import the compiler directly into y
   document.body.innerHTML = run(code, env);
 </script>
 ```
+
+### Browser Bundle
+A single-file ESM bundle is available at `khem.js` for embedding:
+
+```html
+<script type="module">
+  import { createEnvironment, run, renderForWeb } from './khem.js';
+  // Works anywhere — no node_modules, no build step
+</script>
+```
+
+Build it yourself: `npm run build`
 
 ### In Node.js
 Perfect for generating static dashboards or reports:
