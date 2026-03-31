@@ -195,13 +195,17 @@ function compileOneContent(cmd, locals, procNames) {
       const v = args[0] || "i";
       const s = typeof args[1] === "string" ? contentSub(args[1], locals) : jsStr(args[1]);
       const e = typeof args[2] === "string" ? contentSub(args[2], locals) : jsStr(args[2]);
-      const b = compileContentBody(args[3], locals, procNames);
+      const forLocals = new Set(locals);
+      forLocals.add(v);
+      const b = compileContentBody(args[3], forLocals, procNames);
       return `(function(){var __r="";for(var ${v}=Number(${s});${v}<=Number(${e});${v}++){__r+=${b}}return __r})()`;
     }
     case "foreach": {
       const v = args[0] || "v";
       const l = typeof args[1] === "string" ? contentSub(args[1], locals) : jsStr(args[1]);
-      const b = compileContentBody(args[2], locals, procNames);
+      const feLocals = new Set(locals);
+      feLocals.add(v);
+      const b = compileContentBody(args[2], feLocals, procNames);
       return `(function(){var __r="";(${l}).split(" ").forEach(function(${v}){__r+=${b}});return __r})()`;
     }
     case "proc": case "set": case "on": case "state":
