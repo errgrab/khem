@@ -141,21 +141,19 @@ test("section/main/header/footer: semantic", () => {
 // State & Reactivity
 console.log("\n--- State & Reactivity ---\n");
 
-test("state: declares reactive variable", () => {
+test("state: declares variable", () => {
   const html = runForWeb('state count "0"\np { text "Count: $count" }');
-  assertContains(html, 'data-bind="count"', "data-bind");
-  assertContains(html, ">0</span>", "initial value");
+  assertContains(html, ">Count: 0</p>", "substituted value");
 });
 
 test("state: bootstrap script", () => {
   const html = runForWeb('state count "0"\np { text "$count" }');
   assertContains(html, 'var __s=', "state object");
-  assertContains(html, '__set', "set function");
+  assertContains(html, '__render', "render function");
 });
 
-test("state: non-reactive var not wrapped", () => {
+test("state: non-reactive var also substituted", () => {
   const html = runForWeb('set x "hello"\np { text "$x" }');
-  assertNotContains(html, "data-bind", "no data-bind");
   assertContains(html, ">hello</p>", "substituted");
 });
 
@@ -165,13 +163,14 @@ console.log("\n--- Events ---\n");
 test("on_click: generates onclick", () => {
   const html = runForWeb('state count "0"\nbutton { text "+"; on_click { set count "1" } }');
   assertContains(html, "onclick=", "has onclick");
-  assertContains(html, "__set", "calls __set");
+  assertContains(html, "__s[", "updates state");
 });
 
 test("on_click: with expr", () => {
   const html = runForWeb('state count "0"\nbutton { text "+"; on_click { set count expr "$count + 1" } }');
   assertContains(html, "onclick=", "has onclick");
   assertContains(html, "eval(", "evaluates expr");
+  assertContains(html, "__render()", "triggers render");
 });
 
 // Style
@@ -210,7 +209,7 @@ test("counter app", () => {
     }
   `);
   assertContains(html, 'class="app"', "app div");
-  assertContains(html, 'data-bind="count"', "count binding");
+  assertContains(html, "Count: 0", "count value");
   assertContains(html, "onclick=", "buttons have onclick");
   assertContains(html, 'class="btn"', "button classes");
 });

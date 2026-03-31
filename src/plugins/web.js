@@ -18,7 +18,6 @@ function parseCSS(src, env) {
 }
 
 // --- Khem → JS compiler (for event handlers) ---
-// rawAST: optional raw (un-substituted) AST for expr preservation
 function compileToJS(commands, env, rawAST) {
   const lines = [];
   for (let ci = 0; ci < commands.length; ci++) {
@@ -29,28 +28,26 @@ function compileToJS(commands, env, rawAST) {
 
     if (name === "set") {
       const key = typeof args[0] === "string" ? args[0] : "";
-      // Use raw AST args to preserve $vars in expr (not substituted)
       const rawCmd = rawAST && rawAST[ci] ? rawAST[ci] : cmd;
       const rawArgs = rawCmd.slice(1);
 
       if (args[1] === "expr" && typeof args[2] === "string") {
-        // Use RAW expression (with $vars intact) for runtime evaluation
         const rawExpr = typeof rawArgs[2] === "string" ? rawArgs[2] : args[2];
         const jsExpr = rawExpr.replace(
           /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
           (_, n) => `Number(__s[${JSON.stringify(n)}])`
         );
-        lines.push(`__set(${JSON.stringify(key)}, (function(){try{return String(eval(${JSON.stringify(jsExpr)}))}catch{return "0"}})())`);
+        lines.push(`__s[${JSON.stringify(key)}]=String((function(){try{return eval(${JSON.stringify(jsExpr)})}catch{return 0}})())`);
       } else {
         const val = args[1];
         const valJS = typeof val === "string" ? JSON.stringify(val) : `""`;
-        lines.push(`__set(${JSON.stringify(key)}, ${valJS})`);
+        lines.push(`__s[${JSON.stringify(key)}]=${valJS}`);
       }
     } else {
       const argStrs = args.map(a =>
         typeof a === "string" ? JSON.stringify(a) : `""`
       );
-      lines.push(`__cmd(${JSON.stringify(name)}, ${argStrs.join(", ")})`);
+      lines.push(`(${name})(${argStrs.join(", ")})`);
     }
   }
   return lines.join("; ");
@@ -58,79 +55,30 @@ function compileToJS(commands, env, rawAST) {
 
 export function loadWebLib(env) {
   const c = env.cmds;
-  const ctx = { styles: [], bootScript: "" };
+  const ctx = { styles: [] };
   env._webCtx = ctx;
   env._state = env._state || {};
-  env._stateRefs = env._stateRefs || new Set();
 
-  // --- Reactive text ---
-  const origText = c["text"];
-  c["text"] = ([content]) => {
-    if (!content) return "";
-    const state = env._state;
-
-    // Restore escaped dollars
-    let result = content.replace(/\x01/g, "\x02");
-
-    // Substitute $vars — always wrap in data-bind for granular updates
-    result = result.replace(
-      /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
-      (match, name) => {
-        if (name in state) {
-          env._stateRefs.add(name);
-          return `<span data-bind="${name}">${state[name]}</span>`;
-        }
-        return match;
-      }
-    );
-
-    // Restore escaped dollars
-    result = result.replace(/\x02/g, "$");
-    return result;
-  };
-
-  // Override set to handle reactive state
-  const origSet = c["set"];
-  c["set"] = ([key, value], scope) => {
-    if (key in env._state) {
-      env._state[key] = value ?? "";
-      env._stateRefs.add(key);
-      return null;
-    }
-    return origSet([key, value], scope);
-  };
-
-  // --- Primitives ---
-
-  // elem "tag" { body }
+  // --- elem "tag" { body } ---
   c["elem"] = ([tag, body], scope) => {
     if (!tag) return "";
     const bodyStr = typeof body === "string" ? body : "";
 
-    // Save attr context (stack for nesting)
     const prevAttrs = env._elemAttrs;
     const prevEvents = env._elemEvents;
     env._elemAttrs = {};
     env._elemEvents = {};
 
-    // Evaluate body — attr/on set context, other commands produce output
     let content;
     try {
-      const bodyAST = parse(bodyStr);
-      content = evaluate(bodyAST, scope, env).join("");
-    } catch (e) {
-      content = bodyStr;
-    }
+      content = evaluate(parse(bodyStr), scope, env).join("");
+    } catch (e) { content = bodyStr; }
 
-    // Read accumulated attrs
     const attrs = { ...env._elemAttrs };
     const events = { ...env._elemEvents };
-
-    // Restore context
     env._elemAttrs = prevAttrs;
     env._elemEvents = prevEvents;
 
-    // Build attrs string
     let attrStr = "";
     for (const [k, v] of Object.entries(attrs)) {
       attrStr += v ? ` ${k}="${v}"` : ` ${k}`;
@@ -139,14 +87,12 @@ export function loadWebLib(env) {
       attrStr += ` on${evt}='${js}'`;
     }
 
-    // Self-closing void elements
     const voids = new Set(["br","hr","img","input","meta","link","area","base","col","embed","source","track","wbr"]);
     if (voids.has(tag)) return `<${tag}${attrStr}>`;
-
     return `<${tag}${attrStr}>${content}</${tag}>`;
   };
 
-  // a "href" { body } — link element with href as first arg
+  // a "href" { body }
   c["a"] = ([href, body], scope) => {
     const bodyStr = typeof body === "string" ? body : "";
     const prevAttrs = env._elemAttrs;
@@ -154,9 +100,8 @@ export function loadWebLib(env) {
     env._elemAttrs = { href: href ?? "#" };
     env._elemEvents = {};
     let content;
-    try {
-      content = evaluate(parse(bodyStr), scope, env).join("");
-    } catch (e) { content = bodyStr; }
+    try { content = evaluate(parse(bodyStr), scope, env).join(""); }
+    catch (e) { content = bodyStr; }
     const attrs = { ...env._elemAttrs };
     const events = { ...env._elemEvents };
     env._elemAttrs = prevAttrs;
@@ -167,37 +112,38 @@ export function loadWebLib(env) {
     return `<a${attrStr}>${content}</a>`;
   };
 
-  // attr "key" "value" — sets attribute on enclosing elem, or returns html string
+  // attr "key" "value"
   c["attr"] = ([key, value]) => {
-    if (env._elemAttrs) {
-      env._elemAttrs[key] = value ?? "";
-      return null;
-    }
-    // Outside elem context: return attr string for composition
+    if (env._elemAttrs) { env._elemAttrs[key] = value ?? ""; return null; }
     return ` ${key}="${value ?? ""}"`;
   };
 
-  // on "event" { body } — binds event on enclosing elem, or returns html string
+  // on "event" { body }
   c["on"] = ([event, body]) => {
     const bodyStr = typeof body === "string" ? body : "";
     const bodyAST = parse(bodyStr);
-    const js = compileToJS(bodyAST, env, bodyAST);
-    if (env._elemEvents) {
-      env._elemEvents[event] = js;
-      return null;
-    }
+    const js = compileToJS(bodyAST, env, bodyAST) + ";__render()";
+    if (env._elemEvents) { env._elemEvents[event] = js; return null; }
     return ` on${event}='${js}'`;
   };
 
-  // state "name" "default" — declares reactive state (no-op at runtime)
+  // state "name" "default"
   c["state"] = ([name, value]) => {
-    if (name && !env._runtime) {
-      env._state[name] = value ?? "";
-    }
+    if (name) env._state[name] = value ?? "";
     return null;
   };
 
-  // style { ... } — CSS in khem syntax
+  // text "content"
+  c["text"] = ([content]) => {
+    if (!content) return "";
+    const state = env._state;
+    return content.replace(/\x01/g, "\x02").replace(
+      /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
+      (match, name) => (name in state ? String(state[name]) : match)
+    ).replace(/\x02/g, "$");
+  };
+
+  // style { ... }
   c["style"] = ([src]) => {
     if (src) ctx.styles.push(parseCSS(src, env));
     return null;
@@ -205,34 +151,27 @@ export function loadWebLib(env) {
 }
 
 export function generateHTML(env) {
-  const ctx = env._webCtx || { styles: [], bootScript: "" };
+  const webCtx = env._webCtx || { styles: [] };
   const state = env._state || {};
-  const refs = env._stateRefs || new Set();
+  const styles = webCtx.styles.join("\n");
+  const body = env._output || "";
 
-  const userStyles = ctx.styles.join("\n");
-
-  // Generate bootstrap script for reactive state
+  const stateKeys = Object.keys(state);
   let bootScript = "";
-  if (refs.size > 0) {
-    const stateObj = {};
-    for (const name of Object.keys(state)) {
-      stateObj[name] = state[name];
-    }
 
-    // Embed source code for re-evaluation
-    const srcCode = (env._source || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n");
+  if (stateKeys.length > 0) {
+    const srcEscaped = (env._source || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n");
 
     bootScript = `
-var __s=${JSON.stringify(stateObj)};
-var __src='${srcCode}';
+var __s=${JSON.stringify(state)};
+var __src='${srcEscaped}';
 var __ast=khem.parse(__src);
-function __set(k,v){__s[k]=String(v);
-var els=document.querySelectorAll('[data-bind="'+k+'"]');
-if(els.length){els.forEach(function(e){e.textContent=__s[k];});}
-else{var _env=khem.createEnvironment(true);
-_env._state=__s;_env._runtime=true;
+function __render(){
+var _env=khem.createEnvironment(true);
+_env._state=__s;
 var _scope=khem.createScope();_scope.vars=__s;
-document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');}}
+document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');
+}
 `;
   }
 
@@ -241,19 +180,17 @@ document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    ${userStyles}
-  </style>
+  <style>${styles}</style>
 </head>
 <body>
-  <div id="app">${env._output || ""}</div>
-  <script src="khem-runtime.js"></script>
+  <div id="app">${body}</div>
+  ${stateKeys.length > 0 ? `<script src="khem-runtime.js"></script>` : ""}
   ${bootScript ? `<script>${bootScript}</script>` : ""}
 </body>
 </html>`;
 }
 
-// --- Backward compatibility ---
+// Backward compat
 export function runWeb(code, env) {
   const scope = { vars: env.vars, parent: null };
   env._output = evaluate(parse(code), scope, env).join("");
