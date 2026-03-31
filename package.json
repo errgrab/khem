@@ -8,7 +8,6 @@
   },
   "scripts": {
     "build": "esbuild src/index.js --bundle --format=esm --outfile=khem.js --minify",
-    "build:runtime": "esbuild src/runtime.js --bundle --format=iife --global-name=khem --outfile=khem-runtime.js --minify",
     "test": "node tests/parser_test.js && node tests/stdlib_test.js && node tests/web_test.js",
     "repl": "node bin/khem.js repl",
     "watch": "node bin/khem.js watch",

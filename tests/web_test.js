@@ -3,42 +3,13 @@ import { evaluate, createScope } from "../src/core/engine.js";
 import { loadStdLib } from "../src/plugins/stdlib.js";
 import { loadWebLib, generateHTML } from "../src/plugins/web.js";
 
-// Inline web.kh procs
-const WEB_KH = `proc div {body} { elem "div" "$body" }
-proc span {body} { elem "span" "$body" }
-proc p {body} { elem "p" "$body" }
-proc h1 {body} { elem "h1" "$body" }
-proc h2 {body} { elem "h2" "$body" }
-proc h3 {body} { elem "h3" "$body" }
-proc ul {body} { elem "ul" "$body" }
-proc ol {body} { elem "ol" "$body" }
-proc li {body} { elem "li" "$body" }
-proc table {body} { elem "table" "$body" }
-proc tr {body} { elem "tr" "$body" }
-proc td {body} { elem "td" "$body" }
-proc section {body} { elem "section" "$body" }
-proc main {body} { elem "main" "$body" }
-proc header {body} { elem "header" "$body" }
-proc footer {body} { elem "footer" "$body" }
-proc nav {body} { elem "nav" "$body" }
-proc button {body} { elem "button" "$body" }
-proc br {} { elem "br" "" }
-proc hr {} { elem "hr" "" }
-proc class {name} { attr "class" "$name" }
-proc id {name} { attr "id" "$name" }
-proc data {key; val} { attr "data-$key" "$val" }
-proc on_click {body} { on "click" "$body" }
-proc on_input {body} { on "input" "$body" }`;
-
 function runForWeb(code) {
   try {
-    const env = { cmds: {}, vars: {}, _state: {}, _stateRefs: new Set() };
+    const env = { cmds: {}, vars: {}, _state: {} };
     loadStdLib(env);
     loadWebLib(env);
+    env._source = code;
     const scope = createScope();
-    // Load web.kh procs
-    evaluate(parse(WEB_KH), scope, env);
-    // Run user code
     env._output = evaluate(parse(code), scope, env).join("");
     return generateHTML(env);
   } catch (e) {
@@ -62,7 +33,7 @@ function test(name, fn) {
   catch (e) { failed++; console.log(`  ✗ ${name}: ${e.message}`); }
 }
 
-console.log("\n=== Web Library Tests (New Architecture) ===\n");
+console.log("\n=== Web Library Tests ===\n");
 
 // HTML Tags
 console.log("--- HTML Tags ---\n");

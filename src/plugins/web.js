@@ -1,5 +1,5 @@
 import { parse } from "../core/parser.js";
-import { evaluate, createScope, sub, lookup } from "../core/engine.js";
+import { evaluate, createScope } from "../core/engine.js";
 
 // --- CSS parser (khem syntax → CSS) ---
 function parseCSS(src, env) {
@@ -127,13 +127,13 @@ export function loadWebLib(env) {
     return ` on${event}='${js}'`;
   };
 
-  // state "name" "default"
+  // state "name" "default" — declare reactive state variable
   c["state"] = ([name, value]) => {
     if (name) env._state[name] = value ?? "";
     return null;
   };
 
-  // text "content"
+  // text "$var" — plain substitution from env._state
   c["text"] = ([content]) => {
     if (!content) return "";
     const state = env._state;
@@ -148,6 +148,55 @@ export function loadWebLib(env) {
     if (src) ctx.styles.push(parseCSS(src, env));
     return null;
   };
+
+  // --- Register HTML tag commands directly ---
+  const blockTags = [
+    "div","span","p","h1","h2","h3","h4","h5","h6",
+    "ul","ol","li","table","tr","td","th",
+    "section","main","header","footer","nav","article",
+    "form","pre","code","blockquote","strong","em","button","input"
+  ];
+  for (const tag of blockTags) {
+    c[tag] = ([body], scope) => c["elem"]([tag, body], scope);
+  }
+
+  // Void elements
+  c["br"] = () => c["elem"](["br", ""]);
+  c["hr"] = () => c["elem"](["hr", ""]);
+
+  // img with src/alt
+  c["img"] = ([src, alt], scope) => {
+    env._elemAttrs = env._elemAttrs || {};
+    env._elemEvents = env._elemEvents || {};
+    const prevAttrs = env._elemAttrs;
+    const prevEvents = env._elemEvents;
+    env._elemAttrs = { src: src ?? "", alt: alt ?? "" };
+    env._elemEvents = {};
+    const attrs = { ...env._elemAttrs };
+    const events = { ...env._elemEvents };
+    env._elemAttrs = prevAttrs;
+    env._elemEvents = prevEvents;
+    let attrStr = "";
+    for (const [k, v] of Object.entries(attrs)) { attrStr += v ? ` ${k}="${v}"` : ` ${k}`; }
+    return `<img${attrStr}>`;
+  };
+
+  // Attribute shortcuts
+  c["class"] = ([name]) => c["attr"](["class", name]);
+  c["id"] = ([name]) => c["attr"](["id", name]);
+  c["data"] = ([key, val]) => c["attr"]([`data-${key}`, val]);
+  c["href"] = ([url]) => c["attr"](["href", url]);
+  c["src"] = ([url]) => c["attr"](["src", url]);
+  c["type"] = ([val]) => c["attr"](["type", val]);
+  c["value"] = ([val]) => c["attr"](["value", val]);
+  c["placeholder"] = ([val]) => c["attr"](["placeholder", val]);
+
+  // Event shortcuts
+  c["on_click"] = ([body]) => c["on"](["click", body]);
+  c["on_input"] = ([body]) => c["on"](["input", body]);
+  c["on_change"] = ([body]) => c["on"](["change", body]);
+  c["on_submit"] = ([body]) => c["on"](["submit", body]);
+  c["on_keydown"] = ([body]) => c["on"](["keydown", body]);
 }
 
 export function generateHTML(env) {
@@ -165,11 +214,11 @@ export function generateHTML(env) {
     bootScript = `
 var __s=${JSON.stringify(state)};
 var __src='${srcEscaped}';
-var __ast=khem.parse(__src);
 function __render(){
 var _env=khem.createEnvironment(true);
 _env._state=__s;
 var _scope=khem.createScope();_scope.vars=__s;
+var __ast=khem.parse(__src);
 document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');
 }
 `;
@@ -188,11 +237,4 @@ document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('
   ${bootScript ? `<script>${bootScript}</script>` : ""}
 </body>
 </html>`;
-}
-
-// Backward compat
-export function runWeb(code, env) {
-  const scope = { vars: env.vars, parent: null };
-  env._output = evaluate(parse(code), scope, env).join("");
-  return generateHTML(env);
 }
