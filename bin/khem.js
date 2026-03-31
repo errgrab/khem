@@ -126,6 +126,20 @@ const serveFile = (filePath, port = 4173, forceWeb = false) => {
       return;
     }
 
+    // Serve khem-runtime.js
+    if (req.url === "/khem-runtime.js") {
+      const runtimePath = path.resolve(__dirname, "..", "khem-runtime.js");
+      try {
+        const runtimeCode = fs.readFileSync(runtimePath, "utf8");
+        res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
+        res.end(runtimeCode);
+      } catch {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("khem-runtime.js not found — run: npm run build:runtime");
+      }
+      return;
+    }
+
     try {
       let output = compileFile(absPath, forceWeb);
 

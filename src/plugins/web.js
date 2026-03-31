@@ -18,22 +18,29 @@ function parseCSS(src, env) {
 }
 
 // --- Khem → JS compiler (for event handlers) ---
-function compileToJS(commands, env) {
+// rawAST: optional raw (un-substituted) AST for expr preservation
+function compileToJS(commands, env, rawAST) {
   const lines = [];
-  for (const cmd of commands) {
+  for (let ci = 0; ci < commands.length; ci++) {
+    const cmd = commands[ci];
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
     const name = cmd[0];
     const args = cmd.slice(1);
 
     if (name === "set") {
       const key = typeof args[0] === "string" ? args[0] : "";
-      // Check if value is an expr sub-command
+      // Use raw AST args to preserve $vars in expr (not substituted)
+      const rawCmd = rawAST && rawAST[ci] ? rawAST[ci] : cmd;
+      const rawArgs = rawCmd.slice(1);
+
       if (args[1] === "expr" && typeof args[2] === "string") {
-        const raw = args[2].replace(
+        // Use RAW expression (with $vars intact) for runtime evaluation
+        const rawExpr = typeof rawArgs[2] === "string" ? rawArgs[2] : args[2];
+        const jsExpr = rawExpr.replace(
           /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
           (_, n) => `__s[${JSON.stringify(n)}]`
         );
-        lines.push(`__set(${JSON.stringify(key)}, (function(){try{return String(eval(${JSON.stringify(raw)}))}catch{return "0"}})())`);
+        lines.push(`__set(${JSON.stringify(key)}, (function(){try{return String(eval(${JSON.stringify(jsExpr)}))}catch{return "0"}})())`);
       } else {
         const val = args[1];
         const valJS = typeof val === "string" ? JSON.stringify(val) : `""`;
@@ -61,19 +68,30 @@ export function loadWebLib(env) {
   c["text"] = ([content]) => {
     if (!content) return "";
     const state = env._state;
-    // Wrap reactive $vars in data-bind spans
-    let result = content.replace(
+    const isRuntime = env._runtime === true;
+
+    // Restore escaped dollars first
+    let result = content.replace(/\x01/g, "\x02");
+
+    // Substitute $vars
+    result = result.replace(
       /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
       (match, name) => {
         if (name in state) {
           env._stateRefs.add(name);
+          if (isRuntime) {
+            // Runtime: plain substitution
+            return String(state[name]);
+          }
+          // Build time: wrap in data-bind span
           return `<span data-bind="${name}">${state[name]}</span>`;
         }
         return match;
       }
     );
+
     // Restore escaped dollars
-    result = result.replace(/\x01/g, "$");
+    result = result.replace(/\x02/g, "$");
     return result;
   };
 
@@ -168,7 +186,8 @@ export function loadWebLib(env) {
   // on "event" { body } — binds event on enclosing elem, or returns html string
   c["on"] = ([event, body]) => {
     const bodyStr = typeof body === "string" ? body : "";
-    const js = compileToJS(parse(bodyStr), env);
+    const bodyAST = parse(bodyStr);
+    const js = compileToJS(bodyAST, env, bodyAST);
     if (env._elemEvents) {
       env._elemEvents[event] = js;
       return null;
@@ -200,14 +219,24 @@ export function generateHTML(env) {
   let bootScript = "";
   if (refs.size > 0) {
     const stateObj = {};
-    for (const name of refs) {
-      if (name in state) stateObj[name] = state[name];
+    for (const name of Object.keys(state)) {
+      stateObj[name] = state[name];
     }
+
+    // Embed source code for re-evaluation
+    const srcCode = (env._source || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n");
+
     bootScript = `
 var __s=${JSON.stringify(stateObj)};
-function __set(k,v){__s[k]=v;
-document.querySelectorAll('[data-bind="'+k+'"]').forEach(function(e){e.textContent=v;});
-}`;
+var __src='${srcCode}';
+var __ast=khem.parse(__src);
+function __set(k,v){__s[k]=String(v);
+var _env=khem.createEnvironment(true);
+_env._state=__s;_env._runtime=true;
+var _scope=khem.createScope();_scope.vars=__s;
+khem.loadWebLib(_env);
+document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');}
+`;
   }
 
   return `<!DOCTYPE html>
@@ -221,6 +250,7 @@ document.querySelectorAll('[data-bind="'+k+'"]').forEach(function(e){e.textConte
 </head>
 <body>
   <div id="app">${env._output || ""}</div>
+  <script src="khem-runtime.js"></script>
   ${bootScript ? `<script>${bootScript}</script>` : ""}
 </body>
 </html>`;

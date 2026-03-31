@@ -17,6 +17,7 @@ export function run(code, env = createEnvironment()) {
 export function renderForWeb(code, baseDir) {
   const env = createEnvironment(true);
   if (baseDir) env._baseDir = baseDir;
+  env._source = code;
 
   // Load web.kh (user-facing procs: div, span, class, on_click, etc.)
   const webKh = loadWebKh();
