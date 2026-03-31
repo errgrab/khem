@@ -25,6 +25,25 @@ function contentSub(s, locals) {
     .replace(/\x02/g, "$");
 }
 
+// Compile a single content part — string or nested array (from [brackets])
+function compileContentPart(arg, locals, procNames) {
+  if (typeof arg === "string") {
+    const subbed = contentSub(arg, locals);
+    return subbed === arg ? jsStr(arg) : `"${subbed}"`;
+  }
+  if (Array.isArray(arg)) {
+    // Nested command substitution — compile as expression
+    if (arg.length === 1 && Array.isArray(arg[0])) {
+      const c = arg[0];
+      const fn = c[0];
+      const fargs = c.slice(1).map(a => typeof a === "string" ? jsStr(a) : compileContentPart(a, locals, procNames));
+      return `${fn}(${fargs.join(", ")})`;
+    }
+    return jsStr(String(arg));
+  }
+  return jsStr(String(arg));
+}
+
 // Compile set command to JS statement (for render function)
 function compileSetStmt(cmd, locals, out) {
   const args = cmd.slice(1);
@@ -59,7 +78,48 @@ function compileEventAttr(cmd, locals) {
   const bodyCmds = parse(typeof body === "string" ? body : "");
   const js = [];
   for (const c of bodyCmds) {
-    if (Array.isArray(c) && c[0] === "set") compileSetHandler(c, locals, js);
+    if (!Array.isArray(c) || c.length === 0) continue;
+    const cn = c[0];
+    if (cn === "set") {
+      compileSetHandler(c, locals, js);
+    } else if (cn === "if") {
+      // Compile if statement — use compileRef for variable lookup
+      const cond = typeof c[1] === "string"
+        ? c[1].replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (_, n) => compileRef(n, locals))
+        : jsStr(c[1]);
+      if (c[3] === "else" && c[4]) {
+        // if/else → ternary
+        const trueBody = parse(typeof c[2] === "string" ? c[2] : "");
+        const trueJs = [];
+        for (const tc of trueBody) {
+          if (Array.isArray(tc) && tc[0] === "set") compileSetHandler(tc, locals, trueJs);
+        }
+        const falseBody = parse(typeof c[4] === "string" ? c[4] : "");
+        const falseJs = [];
+        for (const fc of falseBody) {
+          if (Array.isArray(fc) && fc[0] === "set") compileSetHandler(fc, locals, falseJs);
+        }
+        if (trueJs.length || falseJs.length) {
+          js.push(`(${cond})?(${trueJs.join(";")}):(${falseJs.join(";")})`);
+        }
+      } else {
+        // Simple if (no else)
+        const innerBody = parse(typeof c[2] === "string" ? c[2] : "");
+        const innerJs = [];
+        for (const ic of innerBody) {
+          if (Array.isArray(ic) && ic[0] === "set") compileSetHandler(ic, locals, innerJs);
+        }
+        if (innerJs.length) {
+          js.push(`(${cond})&&(${innerJs.join(";")})`);
+        }
+      }
+    } else if (typeof cn === "string") {
+      // Proc call or other command → compile as function call
+      const fargs = c.slice(1).map(a =>
+        typeof a === "string" ? jsStr(a) : "String(" + compileContentPart(a, locals) + ")"
+      );
+      js.push(`${cn}(${fargs.join(", ")})`);
+    }
   }
   js.push("__r()");
   return ` on${event}='${js.join(";")}'`;
@@ -90,43 +150,43 @@ function extractAttrs(body, locals) {
 }
 
 // Compile list of content commands to JS expression
-function compileContentCmds(cmds, locals) {
+function compileContentCmds(cmds, locals, procNames) {
   const parts = [];
   for (const cmd of cmds) {
-    const r = compileOneContent(cmd, locals);
+    const r = compileOneContent(cmd, locals, procNames);
     if (r !== null) parts.push(r);
   }
   return parts.length === 0 ? '""' : parts.join(" + ");
 }
 
 // Compile element (tag + body) to JS expression
-function compileElement(tag, body, locals) {
+function compileElement(tag, body, locals, procNames) {
   const { attrStr, contentCmds } = extractAttrs(body, locals);
-  const content = compileContentCmds(contentCmds, locals);
+  const content = compileContentCmds(contentCmds, locals, procNames);
   const voids = new Set(["br","hr","img","input","meta","link","area","base","col","embed","source","track","wbr"]);
   if (voids.has(tag)) return jsStr(`<${tag}${attrStr}>`);
   return jsStr(`<${tag}${attrStr}>`) + " + " + content + " + " + jsStr(`</${tag}>`);
 }
 
 // Compile one content command to JS expression (or null)
-function compileOneContent(cmd, locals) {
+function compileOneContent(cmd, locals, procNames) {
   if (!Array.isArray(cmd) || cmd.length === 0) return null;
   const name = cmd[0], args = cmd.slice(1);
 
   switch (name) {
     case "text": {
-      const s = args[0] ?? "";
-      if (typeof s !== "string") return jsStr(s);
-      const subbed = contentSub(s, locals);
-      return subbed === s ? jsStr(s) : `"${subbed}"`;
+      // Handle multiple args (text "prefix" [proc] "suffix")
+      // and array args (text [proc args])
+      const parts = args.map(a => compileContentPart(a, locals, procNames));
+      return parts.length === 0 ? jsStr("") : parts.join(" + ");
     }
     case "elem":
-      return compileElement(args[0] || "div", args[1] || "", locals);
+      return compileElement(args[0] || "div", args[1] || "", locals, procNames);
     case "if": {
       const cond = typeof args[0] === "string" ? contentSub(args[0], locals) : jsStr(args[0]);
-      const body = compileContentBody(args[1], locals);
+      const body = compileContentBody(args[1], locals, procNames);
       if (args[2] === "else" && args[3]) {
-        const elseBody = compileContentBody(args[3], locals);
+        const elseBody = compileContentBody(args[3], locals, procNames);
         return `((${cond}) ? (${body}) : (${elseBody}))`;
       }
       return `((${cond}) ? (${body}) : (""))`;
@@ -135,16 +195,16 @@ function compileOneContent(cmd, locals) {
       const v = args[0] || "i";
       const s = typeof args[1] === "string" ? contentSub(args[1], locals) : jsStr(args[1]);
       const e = typeof args[2] === "string" ? contentSub(args[2], locals) : jsStr(args[2]);
-      const b = compileContentBody(args[3], locals);
+      const b = compileContentBody(args[3], locals, procNames);
       return `(function(){var __r="";for(var ${v}=Number(${s});${v}<=Number(${e});${v}++){__r+=${b}}return __r})()`;
     }
     case "foreach": {
       const v = args[0] || "v";
       const l = typeof args[1] === "string" ? contentSub(args[1], locals) : jsStr(args[1]);
-      const b = compileContentBody(args[2], locals);
+      const b = compileContentBody(args[2], locals, procNames);
       return `(function(){var __r="";(${l}).split(" ").forEach(function(${v}){__r+=${b}});return __r})()`;
     }
-    case "proc": case "set": case "on":
+    case "proc": case "set": case "on": case "state":
       return null;
     default: {
       // Block tag shorthand: div { ... } → same as elem "div" { ... }
@@ -154,22 +214,29 @@ function compileOneContent(cmd, locals) {
         "section","main","header","footer","nav","article",
         "form","pre","code","blockquote","strong","em","button","input","a",
       ]);
-      if (blockTags.has(name)) return compileElement(name, args[0] || "", locals);
+      if (blockTags.has(name)) return compileElement(name, args[0] || "", locals, procNames);
       if (name === "br" || name === "hr") return jsStr(`<${name}>`);
       if (name === "img") return jsStr(`<img src=${jsStr(args[0] ?? "")} alt=${jsStr(args[1] ?? "")}>`);
+      // Proc call (Bug 1, 3): compile as function call
+      if (procNames && procNames.has(name)) {
+        const fargs = args.map(a =>
+          typeof a === "string" ? jsStr(a) : compileContentPart(a, locals, procNames)
+        );
+        return `${name}(${fargs.join(", ")})`;
+      }
       return null;
     }
   }
 }
 
 // Compile body string to content-only JS expression
-function compileContentBody(body, locals) {
+function compileContentBody(body, locals, procNames) {
   const cmds = typeof body === "string" ? parse(body) : body;
-  return compileContentCmds(cmds, locals);
+  return compileContentCmds(cmds, locals, procNames);
 }
 
 // Compile body to JS statements (for render function with possible set/on mixed in)
-function compileBodyToStmts(body, locals) {
+function compileBodyToStmts(body, locals, procNames) {
   const cmds = typeof body === "string" ? parse(body) : body;
   const stmts = [];
   const contents = [];
@@ -178,7 +245,7 @@ function compileBodyToStmts(body, locals) {
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
     if (cmd[0] === "set") { hasSideEffect = true; compileSetStmt(cmd, locals, stmts); }
     else if (cmd[0] === "on") { hasSideEffect = true; /* skip event in render */ }
-    else { const r = compileOneContent(cmd, locals); if (r !== null) contents.push(r); }
+    else { const r = compileOneContent(cmd, locals, procNames); if (r !== null) contents.push(r); }
   }
   if (!hasSideEffect) {
     if (contents.length === 0) return ["__r+='';"];
@@ -189,7 +256,7 @@ function compileBodyToStmts(body, locals) {
 }
 
 // Compile proc body (may mix set + content → IIFE)
-function compileProcBody(body, locals) {
+function compileProcBody(body, locals, procNames) {
   const cmds = typeof body === "string" ? parse(body) : body;
   const stmts = [];
   const contents = [];
@@ -197,7 +264,7 @@ function compileProcBody(body, locals) {
   for (const cmd of cmds) {
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
     if (cmd[0] === "set") { hasSideEffect = true; compileSetStmt(cmd, locals, stmts); }
-    else { const r = compileOneContent(cmd, locals); if (r !== null) contents.push(r); }
+    else { const r = compileOneContent(cmd, locals, procNames); if (r !== null) contents.push(r); }
   }
   if (!hasSideEffect) return contents.length === 0 ? '""' : contents.join(" + ");
   // IIFE for mixed body
@@ -226,6 +293,7 @@ export function compile(ast, env) {
   }
 
   // Compile procs
+  const procNames = new Set(procFuncs.map(c => c[1]));
   const procJS = [];
   for (const cmd of procFuncs) {
     const name = cmd[1];
@@ -234,7 +302,7 @@ export function compile(ast, env) {
     const paramCmds = parse(rawParams);
     const params = paramCmds.map(p => typeof p === "string" ? p : String(p[0]));
     const locals = new Set(params);
-    procJS.push(`function ${name}(${params.join(", ")}){return ${compileProcBody(body, locals)}}`);
+    procJS.push(`function ${name}(${params.join(", ")}){return ${compileProcBody(body, locals, procNames)}}`);
   }
 
   // Compile render body
@@ -246,7 +314,7 @@ export function compile(ast, env) {
     if (n === "set") {
       compileSetStmt(cmd, locals, renderStmts);
     } else {
-      const expr = compileOneContent(cmd, locals);
+      const expr = compileOneContent(cmd, locals, procNames);
       if (expr !== null) {
         renderStmts.push(expr);
       }
