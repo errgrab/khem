@@ -38,7 +38,7 @@ function compileToJS(commands, env, rawAST) {
         const rawExpr = typeof rawArgs[2] === "string" ? rawArgs[2] : args[2];
         const jsExpr = rawExpr.replace(
           /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
-          (_, n) => `__s[${JSON.stringify(n)}]`
+          (_, n) => `Number(__s[${JSON.stringify(n)}])`
         );
         lines.push(`__set(${JSON.stringify(key)}, (function(){try{return String(eval(${JSON.stringify(jsExpr)}))}catch{return "0"}})())`);
       } else {
