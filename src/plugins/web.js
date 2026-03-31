@@ -68,22 +68,16 @@ export function loadWebLib(env) {
   c["text"] = ([content]) => {
     if (!content) return "";
     const state = env._state;
-    const isRuntime = env._runtime === true;
 
-    // Restore escaped dollars first
+    // Restore escaped dollars
     let result = content.replace(/\x01/g, "\x02");
 
-    // Substitute $vars
+    // Substitute $vars — always wrap in data-bind for granular updates
     result = result.replace(
       /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
       (match, name) => {
         if (name in state) {
           env._stateRefs.add(name);
-          if (isRuntime) {
-            // Runtime: plain substitution
-            return String(state[name]);
-          }
-          // Build time: wrap in data-bind span
           return `<span data-bind="${name}">${state[name]}</span>`;
         }
         return match;
@@ -233,11 +227,12 @@ var __s=${JSON.stringify(stateObj)};
 var __src='${srcCode}';
 var __ast=khem.parse(__src);
 function __set(k,v){__s[k]=String(v);
-var _env=khem.createEnvironment(true);
+var els=document.querySelectorAll('[data-bind="'+k+'"]');
+if(els.length){els.forEach(function(e){e.textContent=__s[k];});}
+else{var _env=khem.createEnvironment(true);
 _env._state=__s;_env._runtime=true;
 var _scope=khem.createScope();_scope.vars=__s;
-khem.loadWebLib(_env);
-document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');}
+document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');}}
 `;
   }
 
