@@ -195,9 +195,11 @@ export function loadWebLib(env) {
     return ` on${event}='${js}'`;
   };
 
-  // state "name" "default" — declares reactive state
+  // state "name" "default" — declares reactive state (no-op at runtime)
   c["state"] = ([name, value]) => {
-    if (name) env._state[name] = value ?? "";
+    if (name && !env._runtime) {
+      env._state[name] = value ?? "";
+    }
     return null;
   };
 
