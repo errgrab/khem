@@ -84,17 +84,18 @@ function compileEventAttr(cmd, locals) {
       compileSetHandler(c, locals, js);
     } else if (cn === "if") {
       // Compile if statement — use compileRef for variable lookup
+      // c = ["if", cond, value, body, "else", elseBody]
       const cond = typeof c[1] === "string"
         ? c[1].replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (_, n) => compileRef(n, locals))
         : jsStr(c[1]);
-      if (c[3] === "else" && c[4]) {
+      if (c[4] === "else" && c[5]) {
         // if/else → ternary
-        const trueBody = parse(typeof c[2] === "string" ? c[2] : "");
+        const trueBody = parse(typeof c[3] === "string" ? c[3] : "");
         const trueJs = [];
         for (const tc of trueBody) {
           if (Array.isArray(tc) && tc[0] === "set") compileSetHandler(tc, locals, trueJs);
         }
-        const falseBody = parse(typeof c[4] === "string" ? c[4] : "");
+        const falseBody = parse(typeof c[5] === "string" ? c[5] : "");
         const falseJs = [];
         for (const fc of falseBody) {
           if (Array.isArray(fc) && fc[0] === "set") compileSetHandler(fc, locals, falseJs);
@@ -104,7 +105,7 @@ function compileEventAttr(cmd, locals) {
         }
       } else {
         // Simple if (no else)
-        const innerBody = parse(typeof c[2] === "string" ? c[2] : "");
+        const innerBody = parse(typeof c[3] === "string" ? c[3] : "");
         const innerJs = [];
         for (const ic of innerBody) {
           if (Array.isArray(ic) && ic[0] === "set") compileSetHandler(ic, locals, innerJs);
@@ -184,9 +185,9 @@ function compileOneContent(cmd, locals, procNames) {
       return compileElement(args[0] || "div", args[1] || "", locals, procNames);
     case "if": {
       const cond = typeof args[0] === "string" ? contentSub(args[0], locals) : jsStr(args[0]);
-      const body = compileContentBody(args[1], locals, procNames);
-      if (args[2] === "else" && args[3]) {
-        const elseBody = compileContentBody(args[3], locals, procNames);
+      const body = compileContentBody(args[2], locals, procNames);
+      if (args[3] === "else" && args[4]) {
+        const elseBody = compileContentBody(args[4], locals, procNames);
         return `((${cond}) ? (${body}) : (${elseBody}))`;
       }
       return `((${cond}) ? (${body}) : (""))`;
