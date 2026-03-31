@@ -1,178 +1,366 @@
 # khem / ▲{■}
 
-**Khem** ("The Black Land") is a minimalist, homoiconic scripting language and UI compiler. It is designed to transform high-density logic into optimized HTML/CSS structures while maintaining a unified syntax for both backend compilation and frontend DOM manipulation.
+A minimalist, homoiconic scripting language for building interactive interfaces.
 
-The project is architected to be environment-agnostic, running natively in **Node.js** for static site generation or directly in the **Browser** as a lightweight client-side runtime.
+Everything is a command. Code is data. No boilerplate.
 
----
-
-## 1. Core Philosophy
-
-* **Homoiconic**: Code is data. Every statement is a list, making the language incredibly easy to parse, transform, and extend.
-* **Modular Architecture**: The core evaluator is separated from the "Standard Library" and "Web Plugins."
-* **Minimalist Aesthetic**: Built for the Khem design system—dark-first, information-dense, and typographically driven.
-* **Zero-Dependency**: The core engine is pure JavaScript with no external overhead.
-
----
-
-## 2. Project Structure
-
-```text
-khem-lang/
-├── src/
-│   ├── index.js          # Main entry (loads stdlib + web plugins)
-│   ├── core/
-│   │   ├── parser.js     # Text-to-AST Tokenizer
-│   │   └── engine.js     # AST Evaluator & Scoping Logic
-│   └── plugins/
-│       ├── stdlib.js     # Control flow (if, for, proc, set)
-│       └── web.js        # DOM elements, CSS compiler, Script injection
-├── ide.html              # Integrated Development Environment
-└── package.json          # Node.js ESM configuration
-```
-
----
-
-## 3. Usage
-
-### Native Khem Script Tags
-Run KhemCode directly inside script tags, just like JavaScript. Any HTML returned by the script will be automatically injected into the DOM at the script's location.
+## Quick Start
 
 ```html
-<!-- Load the Khem bootstrapper -->
-<script type="module" src="./src/index.js"></script>
-
-<!-- Inline Khem script -->
+<script type="module" src="./khem.js"></script>
 <script type="text/khem">
-  div "container" {
-    h1 "" { text "Hello from Khem!" }
+  state count "0"
+
+  div { class "app";
+    h1 { text "Counter" };
+    p { text "Count: $count" };
+    button { text "+"; on_click { set count expr "$count + 1" } }
+  }
+
+  style {
+    ".app" { max-width 400px; margin "0 auto"; padding 2rem }
   }
 </script>
-
-<!-- External Khem script -->
-<script type="text/khem" src="app.kh"></script>
 ```
 
-### Inside the Browser (Module)
-Khem is designed for the modern web. You can import the compiler directly into your HTML for manual control:
+Compiles to reactive HTML. `$count` auto-updates in the DOM when state changes.
 
-```html
-<script type="module">
-  import { createEnvironment, run } from 'https://khem.erikg.org/khem.js';
+## Syntax
 
-  const code = `
-    document "My App" {
-      div "container" {
-        h1 "" { text "Hello Khem" }
-      }
-    }
-  `;
+Khem has three token types:
 
-  const env = createEnvironment();
-  document.body.innerHTML = run(code, env);
-</script>
+```
+word        — contiguous non-special chars
+"string"    — double-quoted, supports $var substitution, \" escape
+{block}     — braced, literal (no substitution), passed as string
 ```
 
-### Browser Bundle
-A single-file ESM bundle is available at `khem.js` for embedding:
-
-```html
-<script type="module">
-  import { createEnvironment, run, renderForWeb } from './khem.js';
-  // Works anywhere — no node_modules, no build step
-</script>
+Separators:
+```
+;           — command separator
+\n          — command separator
+#           — comment (to end of line)
 ```
 
-Build it yourself: `npm run build`
-
-### In Node.js
-Perfect for generating static dashboards or reports:
-
-```javascript
-import { run } from './src/index.js';
-import fs from 'fs';
-
-const khemCode = fs.readFileSync('app.kh', 'utf-8');
-const htmlOutput = run(khemCode);
-
-fs.writeFileSync('dist/index.html', htmlOutput);
+```khem
+# This is a comment
+text "hello"; text "world"
+text "line one"
+text "line two"
 ```
 
----
+### Variables
 
-## 4. Syntax Overview
+```khem
+set name "Erik"
+text "Hello $name"           # → Hello Erik
+```
 
-### Components (Procs)
-Procedures allow for reusable UI components with default arguments.
+`$var` substitutes the variable value. If not found, `$var` is left literal.
 
-```tcl
-proc card { title body type "info" } {
-  div "card $type" {
-    h2 "" { text $title }
-    p "" { text $body }
-  }
+### Blocks
+
+```khem
+div { class "app"; text "content" }
+```
+
+`{...}` is a literal string — no substitution inside. The block is passed to the command, which decides how to handle it.
+
+## Standard Library
+
+### Variables
+```
+set name value              — assign variable
+```
+
+### Control Flow
+```
+if condition { body }                       — conditional
+if condition { body } else { other }        — if/else
+for var start end { body }                  — numeric loop
+foreach var list { body }                   — iterate space-separated list
+match value { pattern { body } ... }        — pattern matching
+```
+
+### Procedures
+```
+proc name {params} { body }                 — define procedure
+proc name {param; param "default"} { body } — with defaults
+return value                                — return from proc
+```
+
+```khem
+proc greet {name; greeting "Hello"} {
+  text "$greeting, $name!"
 }
 
-card "System Status" "All nodes operational." "success"
+greet "Erik"                # → Hello, Erik!
+greet "Erik" "Hey"          # → Hey, Erik!
 ```
 
-### Native CSS (SCSS-Style)
-Define your design system directly within Khem. The compiler deduplicates and injects it into the document head.
+### Strings
+```
+text value                  — return string
+string length str           — string length
+string index str i          — char at index
+string range str from to    — substring
+string toupper str          — uppercase
+string tolower str          — lowercase
+string trim str             — trim whitespace
+string match str pattern    — wildcard match (*, ?)
+replace str old new         — replace all occurrences
+contains str sub            — 1 if contains
+starts-with str prefix      — 1 if starts with
+ends-with str suffix        — 1 if ends with
+upper str                   — shorthand for toupper
+lower str                   — shorthand for tolower
+trim str                    — shorthand for string trim
+slice str from to           — substring
+```
 
-```tcl
+### Lists (space-separated strings)
+```
+list a b c                  — create list "a b c"
+llength list                — number of items
+lindex list i               — item at index
+lappend list item           — append item
+concat a b                  — concatenate
+join list separator         — join with separator
+```
+
+### Math
+```
+expr expression             — evaluate math expression
+incr var ?amount            — increment variable
+abs n | round n | floor n | ceil n | sqrt n
+max a b ... | min a b ...
+```
+
+### Comparison & Logic
+```
+eq a b | neq a b            — equal / not equal
+gt a b | lt a b | gte a b | lte a b
+not a | and a b | or a b
+```
+
+### Dictionary
+```
+dict create key val ...     — create key-value pairs
+dict get d key              — get value
+dict set d key val          — set value
+```
+
+### Error Handling
+```
+try { body } catch { handler }  — try/catch
+throw message                   — throw error
+```
+
+### Date & Time
+```
+today                       — current date (YYYY-MM-DD)
+clock                       — current time (locale string)
+clock seconds               — unix timestamp
+```
+
+### File
+```
+include "file.kh"           — include and evaluate another .kh file
+```
+
+## Web Primitives
+
+The web layer provides 5 core primitives in JS. Everything else is defined in Khem.
+
+### elem — Create Element
+
+```khem
+elem "div" { class "app"; text "content" }
+```
+
+Evaluates the body block. Commands like `class` and `id` set attributes on the element. Content commands (`text`, nested `elem`) produce the body.
+
+### attr — Set Attribute
+
+```khem
+div { class "container"; id "main"; data-theme "dark" }
+```
+
+`attr` sets an attribute on the enclosing `elem`. Any command name that isn't recognized as a known command becomes an attribute setter inside an elem context.
+
+### on — Event Handler
+
+```khem
+button { text "click me"; on "click" { set count expr "$count + 1" } }
+```
+
+Compiles the body to JavaScript and generates `onclick='...'`.
+
+### state — Reactive State
+
+```khem
+state count "0"
+state name "Erik"
+```
+
+Declares a reactive variable. `$count` in text becomes a DOM binding that auto-updates when state changes.
+
+### style — CSS
+
+```khem
 style {
-  ".card" {
-    background var(--s1)
-    border 1px solid var(--border)
-    padding 16px
+  ".app" {
+    max-width 420px
+    margin "0 auto"
+    padding 2rem
   }
-  "h2" { color var(--acc) }
-}
-```
-
-### Full-Stack Scripting
-Khem scripts can be injected to run logic inside the browser.
-
-```tcl
-script {
-  dom_on "#btn" "click" {
-    puts "Interacting with the DOM via Khem logic."
-    dom_set "#status" "textContent" "Active"
+  ".btn:hover" {
+    background var(--acc)
   }
 }
 ```
 
----
+CSS in Khem syntax. Property names and values separated by spaces. Blocks become `{...}` in CSS.
 
-## 5. UI Guidelines
-Khem follows a strict visual identity:
-* **Typography**: DM Mono for 95% of the UI; Instrument Serif for branding.
-* **Colors**: Primary Accent `#c8a84b` (Gold) over Background `#0a0a0a`.
-* **Density**: 12px base font size with 1.6 line-height.
-* **Full design spec**: [`style.md`](style.md)
+## Web Procs (web.kh)
 
----
+User-facing commands defined in Khem itself. You can read, modify, or extend them.
 
-## 6. Development
-To contribute or modify the engine:
-1.  **Clone the repo**: `git clone https://github.com/your-repo/khem-lang.git`
-2.  **Run the IDE**: Use a local server (like Live Server or `npx serve`) to open `ide.html`.
-3.  **Modular Plugins**: Add new commands in `src/plugins/` to extend the language.
+### HTML Tags
 
-### CLI Commands
-- `khem build app.kh` — compile a Khem file to HTML (stdout)
-- `khem watch app.kh` — rebuild to `app.html` when source changes
-- `khem serve app.kh [port]` — serve compiled HTML over HTTP
-- `khem repl` — interactive REPL
-- `khem test` — run node + parser suites
-- `import "./file.kh"` — supported during CLI build/watch/serve preprocessing
----
+```khem
+div { body }          span { body }
+p { body }            h1 { body } ... h6 { body }
+ul { body }           ol { body }         li { body }
+table { body }        tr { body }         td { body }    th { body }
+section { body }      main { body }       header { body }  footer { body }
+nav { body }          article { body }    form { body }
+pre { body }          code { body }       blockquote { body }
+strong { body }       em { body }         button { body }
+br                    hr
+```
 
-## 7. Roadmap
+### Special Elements
 
-The long-term language roadmap is tracked in [`docs/language-roadmap.md`](docs/language-roadmap.md).
+```khem
+a "/path" { class "link"; text "Click" }      # link with href
+img "/photo.jpg" "description"                 # image
+input { id "name"; type "text"; placeholder "Enter..." }
+```
 
-## 8. Editor & Showcases
+### Attribute Helpers
 
-- Editor grammar + completions: [`docs/editor-support.md`](docs/editor-support.md)
-- Runnable showcases: [`examples/showcases/README.md`](examples/showcases/README.md)
+```khem
+class "name"            id "my-id"
+data "key" "value"      href "/path"
+src "/img.png"          type "text"
+value "hello"           placeholder "Enter..."
+```
+
+### Event Helpers
+
+```khem
+on_click { body }       on_input { body }
+on_change { body }      on_submit { body }
+on_keydown { body }
+```
+
+## Reactive Example
+
+```khem
+state count "0"
+
+div { class "app";
+  h1 { text "Counter" };
+  p { text "Value: $count" };
+  button { text "+"; on_click { set count expr "$count + 1" } };
+  button { text "-"; on_click { set count expr "$count - 1" } };
+  button { text "reset"; on_click { set count "0" } }
+}
+
+style {
+  ".app" {
+    display flex
+    flex-direction column
+    align-items center
+    gap "1rem"
+    padding "2rem"
+  }
+}
+```
+
+Output:
+```html
+<div class="app">
+  <h1>Counter</h1>
+  <p>Value: <span data-bind="count">0</span></p>
+  <button onclick='__set("count", ...)'>+</button>
+  <button onclick='__set("count", ...)'>-</button>
+  <button onclick='__set("count", "0")'>reset</button>
+</div>
+<script>
+var __s={"count":"0"};
+function __set(k,v){__s[k]=v;
+document.querySelectorAll('[data-bind="'+k+'"]').forEach(function(e){e.textContent=v;});
+}
+</script>
+```
+
+## CLI
+
+```bash
+khem build app.kh              # compile to HTML (stdout)
+khem watch app.kh              # rebuild on change
+khem serve app.kh [port]       # serve over HTTP
+khem repl                      # interactive REPL
+khem test                      # run test suite
+```
+
+## Browser Usage
+
+```html
+<script type="module">
+  import { renderForWeb } from './khem.js';
+  document.body.innerHTML = renderForWeb(`
+    div { class "app";
+      h1 { text "Hello" };
+      p { text "Built with Khem" }
+    }
+  `);
+</script>
+```
+
+Or with script tags:
+
+```html
+<script type="text/khem">
+  div { class "app"; h1 { text "Hello from Khem!" } }
+</script>
+```
+
+## Project Structure
+
+```
+khem/
+├── src/
+│   ├── index.js          # Entry point, exports, web.kh loader
+│   ├── web.kh            # User-facing web procs (div, span, class, etc.)
+│   ├── core/
+│   │   ├── parser.js     # Text → AST tokenizer
+│   │   └── engine.js     # AST evaluator & scoping
+│   └── plugins/
+│       ├── stdlib.js     # Standard library (if, for, proc, set, ...)
+│       └── web.js        # Web primitives (elem, attr, on, state, style)
+├── bin/khem.js           # CLI
+├── tests/                # Test suites
+├── examples/             # Example .kh files
+└── docs/                 # Language docs
+```
+
+## Design Principles
+
+- **Homoiconic**: Code is data. Every statement is a list.
+- **Minimal core**: Parser + engine + 5 web primitives. Everything else is Khem.
+- **No build step required**: Works in browser with `<script type="text/khem">`.
+- **Zero dependencies**: Pure JavaScript, no external packages.
+- **Reactive by default**: `state` + `$var` = automatic DOM updates.
