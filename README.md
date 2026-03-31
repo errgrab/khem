@@ -1,52 +1,41 @@
-# khem / ▲{■}
+# khem
 
-A minimalist, homoiconic scripting language for building interactive interfaces.
-
-Everything is a command. Code is data. No boilerplate.
+A homoiconic scripting language that compiles to self-contained HTML. No runtime, no dependencies — just one `.html` file.
 
 ## Quick Start
 
-```html
-<script type="module" src="./khem.js"></script>
-<script type="text/khem">
-  state count "0"
-
-  div { class "app";
-    h1 { text "Counter" };
-    p { text "Count: $count" };
-    button { text "+"; on_click { set count expr "$count + 1" } }
-  }
-
-  style {
-    ".app" { max-width 400px; margin "0 auto"; padding 2rem }
-  }
-</script>
+```khem
+set count "0"
+div { class "app"; p { text "Count: $count" }; button { text "+"; on_click { set count expr "$count + 1" } } }
+style { .app { padding 2rem } }
 ```
 
-Compiles to reactive HTML. `$count` auto-updates in the DOM when state changes.
+```bash
+khem build app.kh   # → app.html (self-contained)
+```
+
+Open `app.html` in a browser. That's it.
 
 ## Syntax
 
-Khem has three token types:
+Three token types:
 
 ```
-word        — contiguous non-special chars
-"string"    — double-quoted, supports $var substitution, \" \\ escapes
-{block}     — braced, literal (no substitution), passed as string
+word          — contiguous non-special chars
+"string"      — double-quoted, supports $var substitution, \" \\ \n \t \$ escapes
+{block}       — braced literal, no substitution inside
 ```
 
 Separators:
+
 ```
-;           — command separator
-\n          — command separator
-#           — comment (to end of line)
+; or \n       — command separator
+#             — comment (to end of line)
 ```
 
 ```khem
 # This is a comment
 text "hello"; text "world"
-text "line one"
-text "line two"
 ```
 
 ### Variables
@@ -54,9 +43,8 @@ text "line two"
 ```khem
 set name "Erik"
 text "Hello $name"           # → Hello Erik
+text "Cost: \$price"         # → Cost: $price (escaped)
 ```
-
-`$var` substitutes the variable value. If not found, `$var` is left literal.
 
 ### Blocks
 
@@ -64,295 +52,178 @@ text "Hello $name"           # → Hello Erik
 div { class "app"; text "content" }
 ```
 
-`{...}` is a literal string — no substitution inside. The block is passed to the command, which decides how to handle it.
+`{...}` is a literal string passed to the command. The command decides how to interpret it.
 
-## Standard Library
+## Web Commands
 
-### Variables
-```
-set name value              — assign variable
-```
+### Elements
 
-### Control Flow
-```
-if condition { body }                       — conditional
-if condition { body } else { other }        — if/else
-for var start end { body }                  — numeric loop
-foreach var list { body }                   — iterate space-separated list
-match value { pattern { body } ... }        — pattern matching
+```khem
+div { class "container"; p { text "hello" } }
+span { id "title"; text "Hi" }
+a { href "https://example.com"; text "Link" }
+img { src "photo.jpg"; attr "alt" "Photo" }
+br
+hr
 ```
 
-### Procedures
+All standard HTML tags work directly: `div`, `span`, `p`, `h1`–`h6`, `ul`, `ol`, `li`, `table`, `tr`, `td`, `th`, `section`, `main`, `header`, `footer`, `nav`, `article`, `form`, `pre`, `code`, `blockquote`, `strong`, `em`, `button`, `input`.
+
+### Attributes
+
+```khem
+div { class "box"; id "main"; attr "data-value" "42" }
 ```
-proc name {params} { body }                 — define procedure
-proc name {param; param "default"} { body } — with defaults
-return value                                — return from proc
+
+`class`, `id`, `href`, `src`, `type`, `value`, `placeholder` are built-in. Use `attr "key" "value"` for anything else.
+
+### Text
+
+```khem
+p { text "Hello $name, you have $count items" }
 ```
+
+### Events
+
+```khem
+button { text "Click me"; on_click { set count expr "$count + 1" } }
+input { type "text"; on_input { set query "$event.target.value" } }
+```
+
+Events: `on_click`, `on_input`, `on_change`, `on_submit`, `on_keydown`. Also `on "eventname" { ... }`.
+
+### Style
+
+```khem
+style {
+  .app { max-width 420px; margin 0 auto; padding 2rem }
+  .btn:hover { background var(--acc) }
+}
+```
+
+CSS in Khem syntax. Nested blocks become `{...}`, commands become `property: value;`.
+
+The design system variables (defined in `style.md`) are available as CSS custom properties: `--bg`, `--fg`, `--acc`, `--border`, etc.
+
+## State and Reactivity
+
+```khem
+state count "0"
+p { text "Count: $count" }
+button { text "+"; on_click { set count expr "$count + 1" } }
+```
+
+`state name "default"` declares a reactive variable. When you `set` it, every place that references `$name` updates in the DOM automatically — no manual DOM manipulation needed.
+
+```khem
+state name "World"
+state items "3"
+p { text "Hello $name" }
+p { text "You have $items items" }
+button { text "Add"; on_click { set items expr "$items + 1" } }
+```
+
+## Control Flow
+
+```khem
+if $condition { text "yes" }
+if $x { text "positive" } else { text "zero" }
+for i 1 10 { p { text "Line $i" } }
+foreach item "a b c" { li { text "$item" } }
+match $value { "a" { text "Alpha" } "b" { text "Beta" } default { text "Other" } }
+```
+
+## Procedures
 
 ```khem
 proc greet {name; greeting "Hello"} {
-  text "$greeting, $name!"
+  p { text "$greeting, $name!" }
 }
-
-greet "Erik"                # → Hello, Erik!
-greet "Erik" "Hey"          # → Hey, Erik!
+greet "Erik"              # → Hello, Erik!
+greet "Erik" "Hey"        # → Hey, Erik!
 ```
 
-### Strings
-```
-text value                  — return string
-string length str           — string length
-string index str i          — char at index
-string range str from to    — substring
-string toupper str          — uppercase
-string tolower str          — lowercase
-string trim str             — trim whitespace
-string match str pattern    — wildcard match (*, ?)
-replace str old new         — replace all occurrences
-contains str sub            — 1 if contains
-starts-with str prefix      — 1 if starts with
-ends-with str suffix        — 1 if ends with
-upper str                   — shorthand for toupper
-lower str                   — shorthand for tolower
-trim str                    — shorthand for string trim
-slice str from to           — substring
-```
+## Standard Library
 
-### Lists (space-separated strings)
-```
-list a b c                  — create list "a b c"
-llength list                — number of items
-lindex list i               — item at index
-lappend list item           — append item
-concat a b                  — concatenate
-join list separator         — join with separator
-```
+**Variables:** `set`
 
-### Math
-```
-expr expression             — evaluate math expression
-incr var ?amount            — increment variable
-abs n | round n | floor n | ceil n | sqrt n
-max a b ... | min a b ...
-```
+**Control flow:** `if`, `for`, `foreach`, `match`
 
-### Comparison & Logic
-```
-eq a b | neq a b            — equal / not equal
-gt a b | lt a b | gte a b | lte a b
-not a | and a b | or a b
-```
+**Procedures:** `proc`, `return`
 
-### Dictionary
-```
-dict create key val ...     — create key-value pairs
-dict get d key              — get value
-dict set d key val          — set value
-```
+**Strings:** `string length`, `string index`, `string range`, `string trim`, `string toupper`, `string tolower`, `string match`, `replace`, `trim`, `upper`, `lower`, `slice`, `contains`, `starts-with`, `ends-with`
 
-### Error Handling
-```
-try { body } catch { handler }  — try/catch
-throw message                   — throw error
-```
+**Lists:** `list`, `llength`, `lindex`, `lappend`, `concat`, `join`
 
-### Date & Time
-```
-today                       — current date (YYYY-MM-DD)
-clock                       — current time (locale string)
-clock seconds               — unix timestamp
-```
+**Math:** `expr`, `incr`, `abs`, `round`, `floor`, `ceil`, `sqrt`, `max`, `min`
 
-### File
-```
-include "file.kh"           — include and evaluate another .kh file
-```
+**Comparison:** `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `not`, `and`, `or`
 
-## Web Primitives
+**Dictionary:** `dict create`, `dict get`, `dict set`
 
-The web layer provides 5 core primitives in JS. Everything else is defined in Khem.
+**Date/Time:** `today`, `clock`
 
-### elem — Create Element
+**Error handling:** `try { } catch { }`, `throw`
 
-```khem
-elem "div" { class "app"; text "content" }
-```
-
-Evaluates the body block. Commands like `class` and `id` set attributes on the element. Content commands (`text`, nested `elem`) produce the body.
-
-### attr — Set Attribute
-
-```khem
-div { class "container"; id "main"; data-theme "dark" }
-```
-
-`attr` sets an attribute on the enclosing `elem`. Any command name that isn't recognized as a known command becomes an attribute setter inside an elem context.
-
-### on — Event Handler
-
-```khem
-button { text "click me"; on "click" { set count expr "$count + 1" } }
-```
-
-Compiles the body to JavaScript and generates `onclick='...'`.
-
-### state — Reactive State
-
-```khem
-state count "0"
-state name "Erik"
-```
-
-Declares a reactive variable. `$count` in text becomes a DOM binding that auto-updates when state changes.
-
-### style — CSS
-
-```khem
-style {
-  .app {
-    max-width 420px
-    margin 0 auto
-    padding 2rem
-  }
-  .btn:hover {
-    background var(--acc)
-  }
-}
-```
-
-CSS in Khem syntax. Blocks become `{...}`, commands become `property: value;`.
-
-## Web Procs (web.kh)
-
-User-facing commands defined in Khem itself. You can read, modify, or extend them.
-
-### HTML Tags
-
-```khem
-div { body }          span { body }
-p { body }            h1 { body } ... h6 { body }
-ul { body }           ol { body }         li { body }
-table { body }        tr { body }         td { body }    th { body }
-section { body }      main { body }       header { body }  footer { body }
-nav { body }          article { body }    form { body }
-pre { body }          code { body }       blockquote { body }
-strong { body }       em { body }         button { body }
-br                    hr
-```
-
-### Special Elements
-
-```khem
-a "/path" { class "link"; text "Click" }      # link with href
-img "/photo.jpg" "description"                 # image
-input { id "name"; type "text"; placeholder "Enter..." }
-```
-
-### Attribute Helpers
-
-```khem
-class "name"            id "my-id"
-data "key" "value"      href "/path"
-src "/img.png"          type "text"
-value "hello"           placeholder "Enter..."
-```
-
-### Event Helpers
-
-```khem
-on_click { body }       on_input { body }
-on_change { body }      on_submit { body }
-on_keydown { body }
-```
-
-## Reactive Example
-
-```khem
-state count "0"
-
-div { class "app";
-  h1 { text "Counter" };
-  p { text "Value: $count" };
-  button { text "+"; on_click { set count expr "$count + 1" } };
-  button { text "-"; on_click { set count expr "$count - 1" } };
-  button { text "reset"; on_click { set count "0" } }
-}
-
-style {
-  ".app" {
-    display flex
-    flex-direction column
-    align-items center
-    gap "1rem"
-    padding "2rem"
-  }
-}
-```
-
-Output:
-```html
-<div class="app">
-  <h1>Counter</h1>
-  <p>Value: <span data-bind="count">0</span></p>
-  <button onclick='__set("count", ...)'>+</button>
-  <button onclick='__set("count", ...)'>-</button>
-  <button onclick='__set("count", "0")'>reset</button>
-</div>
-<script>
-var __s={"count":"0"};
-function __set(k,v){__s[k]=v;
-document.querySelectorAll('[data-bind="'+k+'"]').forEach(function(e){e.textContent=v;});
-}
-</script>
-```
+**Files:** `include "file.kh"`
 
 ## CLI
 
 ```bash
-khem build app.kh              # compile to HTML (stdout)
-khem watch app.kh              # rebuild on change
-khem serve app.kh [port]       # serve over HTTP
-khem repl                      # interactive REPL
-khem test                      # run test suite
-```
-
-## Browser Usage
-
-```html
-<script type="module">
-  import { renderForWeb } from './khem.js';
-  document.body.innerHTML = renderForWeb(`
-    div { class "app";
-      h1 { text "Hello" };
-      p { text "Built with Khem" }
-    }
-  `);
-</script>
-```
-
-Or with script tags:
-
-```html
-<script type="text/khem">
-  div { class "app"; h1 { text "Hello from Khem!" } }
-</script>
+khem build <file.kh>         # Build to HTML (auto-detect web mode)
+khem serve <file.kh> [port]  # Dev server with live reload (default: 4173)
+khem watch <file.kh>         # Watch and rebuild on change
+khem repl                    # Interactive REPL
+khem run <file.kh>           # Run a script (stdout)
+khem test                    # Run test suite
+khem ide [dir] [port]        # Serve the built-in IDE
 ```
 
 ## Project Structure
 
 ```
 khem/
+├── bin/khem.js          # CLI entry point
 ├── src/
-│   ├── index.js          # Entry point, exports, web.kh loader
-│   ├── web.kh            # User-facing web procs (div, span, class, etc.)
+│   ├── index.js         # Public API (run, renderForWeb, compile)
+│   ├── compiler.js      # AST → { html, css, js } compiler
 │   ├── core/
-│   │   ├── parser.js     # Text → AST tokenizer
-│   │   └── engine.js     # AST evaluator & scoping
+│   │   ├── parser.js    # Tokenizer + parser
+│   │   └── engine.js    # Evaluator + scope system
 │   └── plugins/
-│       ├── stdlib.js     # Standard library (if, for, proc, set, ...)
-│       └── web.js        # Web primitives (elem, attr, on, state, style)
-├── bin/khem.js           # CLI
-├── tests/                # Test suites
-├── examples/             # Example .kh files
-└── docs/                 # Language docs
+│       ├── stdlib.js    # Core commands (set, if, for, proc, etc.)
+│       └── web.js       # Web commands (elem, attr, on, style, state)
+├── examples/            # Example .kh files
+├── tests/               # Test suites
+├── style.md             # Design system (CSS variables)
+└── docs/spec.md         # Language specification
 ```
+
+## Example: Shift Calendar
+
+```khem
+state month "4"
+state year "2026"
+state d1 "0"; state d2 "0"; state d3 "0"
+
+div { class "app";
+  div { class "header";
+    span { class "logo"; text "Escala" };
+    span { class "sub"; text "Calendário de Turnos" }
+  };
+  div { class "cal";
+    div { class "grid";
+      if "$d1" "0" { span { class "cell"; on_click { set d1 "76" }; text "1" } }
+      else { span { class "cell cell-1"; on_click { set d1 "0" }; text "L" } }
+    }
+  }
+}
+
+style {
+  .app { max-width 420px; margin 40px auto }
+  .cell { aspect-ratio 1; display flex; align-items center; justify-content center; cursor pointer }
+  .cell-1 { background var(--green-dim); color var(--green) }
+}
+```
+
+See `examples/escala.kh` for the full version.
