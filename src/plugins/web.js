@@ -1,241 +1,231 @@
 import { parse } from "../core/parser.js";
-import { evaluate } from "../core/engine.js";
-import { DEFAULT_CSS, GOOGLE_FONTS } from "../styles.js";
+import { evaluate, createScope, sub, lookup } from "../core/engine.js";
 
-let _fs = null;
-let _path = null;
-
-function isNode() {
-  return (
-    typeof process !== "undefined" &&
-    process.versions != null &&
-    process.versions.node != null
-  );
+// --- CSS parser (khem syntax → CSS) ---
+function parseCSS(src, env) {
+  const ev = (t) =>
+    Array.isArray(t) ? evaluate(t, { vars: env.vars, parent: null }, env).join("") : String(t);
+  const fmt = (cmds, ind = "") =>
+    parse(cmds)
+      .map((cmd) => {
+        const last = cmd[cmd.length - 1];
+        if (typeof last === "string" && /[;\n]/.test(last))
+          return `${ind}${cmd.slice(0, -1).map(ev).join(" ")} { \n${fmt(last, ind + "  ")}${ind}}`;
+        return `${ind}${ev(cmd[0])}: ${cmd.slice(1).map(ev).join(" ")};`;
+      })
+      .join("\n") + "\n";
+  return fmt(src);
 }
 
-if (isNode()) {
-  Promise.all([
-    import("node:fs").catch(() => null),
-    import("node:path").catch(() => null),
-  ]).then(([fsMod, pathMod]) => {
-    if (fsMod) _fs = fsMod.default ?? fsMod;
-    if (pathMod) _path = pathMod.default ?? pathMod;
-  });
-}
+// --- Khem → JS compiler (for event handlers) ---
+function compileToJS(commands, env) {
+  const lines = [];
+  for (const cmd of commands) {
+    if (!Array.isArray(cmd) || cmd.length === 0) continue;
+    const name = cmd[0];
+    const args = cmd.slice(1);
 
-export function runWeb(code, env) {
-  const scope = { vars: env.vars, parent: null };
-  evaluate(parse(code), scope, env);
-  return generateHTML(env);
-}
-
-const getCtx = (env) => {
-  if (!env._web)
-    env._web = {
-      title: "Khem App",
-      pages: {},
-      routes: {},
-      styles: [],
-      scripts: [],
-      includes: new Set(),
-    };
-  return env._web;
-};
-
-const renderWeb = (src, scope, env) => {
-  if (typeof src !== "string")
-    throw new Error("RenderWeb: source must be a string");
-  return evaluate(parse(src), scope, env).join("");
-};
-
-function renderArg(arg, scope, env) {
-  if (Array.isArray(arg)) {
-    // Could be a parsed command list [[cmd, ...], ...] or a single command [cmd, ...]
-    // If first element is a string, it's a single command
-    if (arg.length > 0 && typeof arg[0] === "string") {
-      return evaluate([arg], scope, env).join("");
+    if (name === "set") {
+      const key = typeof args[0] === "string" ? args[0] : "";
+      // Check if value is an expr sub-command
+      if (args[1] === "expr" && typeof args[2] === "string") {
+        const raw = args[2].replace(
+          /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
+          (_, n) => `__s[${JSON.stringify(n)}]`
+        );
+        lines.push(`__set(${JSON.stringify(key)}, (function(){try{return String(eval(${JSON.stringify(raw)}))}catch{return "0"}})())`);
+      } else {
+        const val = args[1];
+        const valJS = typeof val === "string" ? JSON.stringify(val) : `""`;
+        lines.push(`__set(${JSON.stringify(key)}, ${valJS})`);
+      }
+    } else {
+      const argStrs = args.map(a =>
+        typeof a === "string" ? JSON.stringify(a) : `""`
+      );
+      lines.push(`__cmd(${JSON.stringify(name)}, ${argStrs.join(", ")})`);
     }
-    // Otherwise it's a list of commands
-    return evaluate(arg, scope, env).join("");
   }
-  if (typeof arg === "string") return renderWeb(arg, scope, env);
-  return String(arg ?? "");
-}
-
-function tagArgs(args, scope, env) {
-  if (args.length === 0)
-    throw new Error("tag expects at least 1 argument");
-
-  // First arg is class if it's a string and there are more args
-  const firstIsClass =
-    typeof args[0] === "string" && args.length > 1 && !Array.isArray(args[0]);
-
-  const className = firstIsClass ? args[0] : "";
-  const bodyArgs = firstIsClass ? args.slice(1) : args;
-
-  const body = bodyArgs.map((a) => renderArg(a, scope, env)).join("");
-
-  return {
-    cls: className ? ` class="${className}"` : "",
-    body,
-  };
+  return lines.join("; ");
 }
 
 export function loadWebLib(env) {
   const c = env.cmds;
-  const ctx = getCtx(env);
+  const ctx = { styles: [], bootScript: "" };
+  env._webCtx = ctx;
+  env._state = env._state || {};
+  env._stateRefs = env._stateRefs || new Set();
 
-  // --- Generic tag builder ---
-
-  // tag "div" "container" { text "hello" }
-  // tag "div" { text "no class" }
-  c["tag"] = (args, scope) => {
-    const name = args[0] ?? "div";
-    const { cls, body } = tagArgs(args.slice(1), scope, env);
-    return `<${name}${cls}>${body}</${name}>`;
+  // --- Reactive text ---
+  const origText = c["text"];
+  c["text"] = ([content]) => {
+    if (!content) return "";
+    const state = env._state;
+    // Wrap reactive $vars in data-bind spans
+    return content.replace(
+      /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
+      (match, name) => {
+        if (name in state) {
+          env._stateRefs.add(name);
+          return `<span data-bind="${name}">${state[name]}</span>`;
+        }
+        return match;
+      }
+    );
   };
 
-  // Void elements (self-closing)
-  const voidTags = ["br", "hr", "img", "input", "meta", "link"];
-  voidTags.forEach((t) => {
-    c[t] = () => `<${t}>`;
-  });
-
-  // Normal elements — register as aliases of tag
-  const htmlTags = [
-    "div", "span", "p",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "ul", "ol", "li",
-    "table", "tr", "td", "th",
-    "section", "main", "header", "footer", "nav", "article",
-    "form", "label", "pre", "code", "blockquote", "strong", "em",
-    "button",
-  ];
-  htmlTags.forEach((t) => {
-    c[t] = (args, scope) => {
-      const { cls, body } = tagArgs(args, scope, env);
-      return `<${t}${cls}>${body}</${t}>`;
-    };
-  });
-
-  // Special: <a href="..."> — first arg is href, rest is class+body
-  c["a"] = (args, scope) => {
-    const href = args[0] ?? "#";
-    const { cls, body } = tagArgs(args.slice(1), scope, env);
-    return `<a href="${href}"${cls}>${body}</a>`;
+  // Override set to handle reactive state
+  const origSet = c["set"];
+  c["set"] = ([key, value], scope) => {
+    if (key in env._state) {
+      env._state[key] = value ?? "";
+      env._stateRefs.add(key);
+      return null;
+    }
+    return origSet([key, value], scope);
   };
 
-  // Special: <img src="..." alt="...">
-  c["img"] = ([src = "", alt = ""]) => `<img src="${src}" alt="${alt}">`;
+  // --- Primitives ---
 
-  // Special: <input> with optional id, class, attrs
-  c["input"] = (args) => {
-    let id = "", cls = "field", attrsStr = "";
-    if (args.length === 1) attrsStr = args[0];
-    else if (args.length === 2) { cls = args[0]; attrsStr = args[1]; }
-    else if (args.length >= 3) { id = args[0]; cls = args[1]; attrsStr = args[2]; }
-    const parsedAttrs = attrsStr
-      ? parse(attrsStr).map(([k, ...v]) => v.length ? `${k}="${v.join(" ")}"` : k).join(" ")
-      : "";
-    return `<input${id ? ` id="${id}"` : ""}${cls ? ` class="${cls}"` : ""}${parsedAttrs ? ` ${parsedAttrs}` : ""}>`;
-  };
+  // elem "tag" { body }
+  c["elem"] = ([tag, body], scope) => {
+    if (!tag) return "";
+    const bodyStr = typeof body === "string" ? body : "";
 
-  // --- Document / routing ---
+    // Save attr context (stack for nesting)
+    const prevAttrs = env._elemAttrs;
+    const prevEvents = env._elemEvents;
+    env._elemAttrs = {};
+    env._elemEvents = {};
 
-  c["title"] = ([t]) => { ctx.title = t ?? "Khem App"; };
-  c["page"] = ([name, body]) => { ctx.pages[name] = body ?? ""; };
-  c["route"] = ([path, page]) => { ctx.routes[path] = page; };
-  c["document"] = ([title, body]) => {
-    if (title) ctx.title = title;
-    ctx.pages["__doc__"] = body ?? "";
-    ctx.routes["#/"] = "__doc__";
-  };
-
-  // --- Style / Script / Include ---
-
-  c["style"] = ([src]) => {
-    if (!src) return;
-    const evalScope = { vars: { ...env.vars }, parent: null };
-    const ev = (t) =>
-      Array.isArray(t) ? evaluate(t, evalScope, env).join("") : String(t);
-    const fmt = (cmds, ind = "") =>
-      parse(cmds)
-        .map((cmd) => {
-          const last = cmd[cmd.length - 1];
-          if (typeof last === "string" && /[;\n]/.test(last))
-            return `${ind}${cmd.slice(0, -1).map(ev).join(" ")} { \n${fmt(last, ind + "  ")}${ind}}`;
-          return `${ind}${ev(cmd[0])}: ${cmd.slice(1).map(ev).join(" ")};`;
-        })
-        .join("\n") + "\n";
-    ctx.styles.push(fmt(src));
-  };
-
-  c["script"] = ([s]) => { if (s) ctx.scripts.push(s); };
-  c["text"] = ([t]) => t ?? "";
-
-  c["include"] = ([file], scope) => {
-    if (!file) return;
-    if (!isNode()) { console.warn(`include "${file}" skipped — browser`); return; }
-    if (!_fs || !_path) { console.error(`include "${file}" skipped — no fs`); return; }
-    const base = env._baseDir ?? process.cwd();
-    const abs = _path.resolve(base, file);
-    if (ctx.includes.has(abs)) return;
-    ctx.includes.add(abs);
-    const prev = env._baseDir;
+    // Evaluate body — attr/on set context, other commands produce output
+    let content;
     try {
-      env._baseDir = _path.dirname(abs);
-      renderWeb(_fs.readFileSync(abs, "utf8"), scope, env);
-    } catch (e) { console.error(`include error: ${e.message}`); }
-    finally { env._baseDir = prev; }
+      const bodyAST = parse(bodyStr);
+      content = evaluate(bodyAST, scope, env).join("");
+    } catch (e) {
+      content = bodyStr;
+    }
+
+    // Read accumulated attrs
+    const attrs = { ...env._elemAttrs };
+    const events = { ...env._elemEvents };
+
+    // Restore context
+    env._elemAttrs = prevAttrs;
+    env._elemEvents = prevEvents;
+
+    // Build attrs string
+    let attrStr = "";
+    for (const [k, v] of Object.entries(attrs)) {
+      attrStr += v ? ` ${k}="${v}"` : ` ${k}`;
+    }
+    for (const [evt, js] of Object.entries(events)) {
+      attrStr += ` on${evt}='${js}'`;
+    }
+
+    // Self-closing void elements
+    const voids = new Set(["br","hr","img","input","meta","link","area","base","col","embed","source","track","wbr"]);
+    if (voids.has(tag)) return `<${tag}${attrStr}>`;
+
+    return `<${tag}${attrStr}>${content}</${tag}>`;
+  };
+
+  // a "href" { body } — link element with href as first arg
+  c["a"] = ([href, body], scope) => {
+    const bodyStr = typeof body === "string" ? body : "";
+    const prevAttrs = env._elemAttrs;
+    const prevEvents = env._elemEvents;
+    env._elemAttrs = { href: href ?? "#" };
+    env._elemEvents = {};
+    let content;
+    try {
+      content = evaluate(parse(bodyStr), scope, env).join("");
+    } catch (e) { content = bodyStr; }
+    const attrs = { ...env._elemAttrs };
+    const events = { ...env._elemEvents };
+    env._elemAttrs = prevAttrs;
+    env._elemEvents = prevEvents;
+    let attrStr = "";
+    for (const [k, v] of Object.entries(attrs)) { attrStr += v ? ` ${k}="${v}"` : ` ${k}`; }
+    for (const [evt, js] of Object.entries(events)) { attrStr += ` on${evt}='${js}'`; }
+    return `<a${attrStr}>${content}</a>`;
+  };
+
+  // attr "key" "value" — sets attribute on enclosing elem, or returns html string
+  c["attr"] = ([key, value]) => {
+    if (env._elemAttrs) {
+      env._elemAttrs[key] = value ?? "";
+      return null;
+    }
+    // Outside elem context: return attr string for composition
+    return ` ${key}="${value ?? ""}"`;
+  };
+
+  // on "event" { body } — binds event on enclosing elem, or returns html string
+  c["on"] = ([event, body]) => {
+    const bodyStr = typeof body === "string" ? body : "";
+    const js = compileToJS(parse(bodyStr), env);
+    if (env._elemEvents) {
+      env._elemEvents[event] = js;
+      return null;
+    }
+    return ` on${event}='${js}'`;
+  };
+
+  // state "name" "default" — declares reactive state
+  c["state"] = ([name, value]) => {
+    if (name) env._state[name] = value ?? "";
+    return null;
+  };
+
+  // style { ... } — CSS in khem syntax
+  c["style"] = ([src]) => {
+    if (src) ctx.styles.push(parseCSS(src, env));
+    return null;
   };
 }
 
 export function generateHTML(env) {
-  const ctx = getCtx(env);
-
-  const pages = {};
-  for (const [name, body] of Object.entries(ctx.pages)) {
-    const scope = { vars: { ...env.vars }, parent: null };
-    pages[name] = renderWeb(body, scope, env);
-  }
-
-  const pageNames = Object.keys(pages);
-  const defaultPage = ctx.routes["#/"] ?? pageNames[0];
-  const initial = pages[defaultPage] ?? "";
-
-  const needsRouting = pageNames.length > 1;
-  const routingJS = needsRouting
-    ? `
-    var T=${JSON.stringify(pages)};
-    var R=${JSON.stringify(ctx.routes)};
-    function route(){
-      var p=R[location.hash||"#/"]||Object.keys(T)[0];
-      if(p&&T[p])document.getElementById("app").innerHTML=T[p];
-    }
-    window.addEventListener("hashchange",route);route();`
-    : "";
+  const ctx = env._webCtx || { styles: [], bootScript: "" };
+  const state = env._state || {};
+  const refs = env._stateRefs || new Set();
 
   const userStyles = ctx.styles.join("\n");
-  const userScripts = ctx.scripts.join("\n");
+
+  // Generate bootstrap script for reactive state
+  let bootScript = "";
+  if (refs.size > 0) {
+    const stateObj = {};
+    for (const name of refs) {
+      if (name in state) stateObj[name] = state[name];
+    }
+    bootScript = `
+var __s=${JSON.stringify(stateObj)};
+function __set(k,v){__s[k]=v;
+document.querySelectorAll('[data-bind="'+k+'"]').forEach(function(e){e.textContent=v;});
+}`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${ctx.title}</title>
-  <link href="${GOOGLE_FONTS}" rel="stylesheet">
   <style>
-    ${DEFAULT_CSS}
     ${userStyles}
   </style>
 </head>
 <body>
-  <div id="app">${initial}</div>
-  <script>
-    ${routingJS}
-    ${userScripts}
-  <\/script>
+  <div id="app">${env._output || ""}</div>
+  ${bootScript ? `<script>${bootScript}</script>` : ""}
 </body>
 </html>`;
+}
+
+// --- Backward compatibility ---
+export function runWeb(code, env) {
+  const scope = { vars: env.vars, parent: null };
+  env._output = evaluate(parse(code), scope, env).join("");
+  return generateHTML(env);
 }

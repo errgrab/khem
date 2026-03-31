@@ -19,6 +19,7 @@ export function sub(text, scope) {
 
 export function evaluate(commands, scope, env) {
   const outputs = [];
+  const subFn = env.sub ?? sub;
 
   for (const cmd of commands) {
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
@@ -33,7 +34,7 @@ export function evaluate(commands, scope, env) {
     }
     const rawArgs = cmd.slice(1);
     const args = rawArgs.map((arg) =>
-      Array.isArray(arg) ? evaluate(arg, scope, env).join("") : sub(arg, scope),
+      Array.isArray(arg) ? evaluate(arg, scope, env).join("") : subFn(arg, scope),
     );
     const result = command(args, scope);
     if (result?.__khemReturn) return [result.value ?? ""];

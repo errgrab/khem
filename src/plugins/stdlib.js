@@ -308,4 +308,36 @@ export function loadStdLib(env) {
         return "";
     }
   };
+
+  // --- Include ---
+  let _fs = null, _path = null;
+  const isNode = () => typeof process !== "undefined" && process.versions?.node != null;
+
+  if (isNode()) {
+    Promise.all([
+      import("node:fs").catch(() => null),
+      import("node:path").catch(() => null),
+    ]).then(([fsMod, pathMod]) => {
+      if (fsMod) _fs = fsMod.default ?? fsMod;
+      if (pathMod) _path = pathMod.default ?? pathMod;
+    });
+  }
+
+  c["include"] = ([file], scope) => {
+    if (!file) return;
+    if (!isNode()) { console.warn(`include "${file}" skipped — browser`); return; }
+    if (!_fs || !_path) { console.error(`include "${file}" skipped — no fs`); return; }
+    const base = env._baseDir ?? process.cwd();
+    const abs = _path.resolve(base, file);
+    if (!env._includes) env._includes = new Set();
+    if (env._includes.has(abs)) return;
+    env._includes.add(abs);
+    const prev = env._baseDir;
+    try {
+      env._baseDir = _path.dirname(abs);
+      const code = _fs.readFileSync(abs, "utf8");
+      evaluate(parse(code), scope, env);
+    } catch (e) { console.error(`include error: ${e.message}`); }
+    finally { env._baseDir = prev; }
+  };
 }

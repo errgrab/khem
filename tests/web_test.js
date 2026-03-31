@@ -1,244 +1,226 @@
-import { createEnvironment } from "../src/index.js";
-import { runWeb } from "../src/plugins/web.js";
+import { parse } from "../src/core/parser.js";
+import { evaluate, createScope } from "../src/core/engine.js";
+import { loadStdLib } from "../src/plugins/stdlib.js";
+import { loadWebLib, generateHTML } from "../src/plugins/web.js";
 
-function assertContains(str, substring, msg) {
-  if (!str.includes(substring)) {
-    throw new Error(`${msg}: expected to contain "${substring}"`);
-  }
-}
-
-let passed = 0;
-let failed = 0;
-
-function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ✓ ${name}`);
-  } catch (e) {
-    failed++;
-    console.log(`  ✗ ${name}: ${e.message}`);
-  }
-}
+// Inline web.kh procs
+const WEB_KH = `proc div {body} { elem "div" "$body" }
+proc span {body} { elem "span" "$body" }
+proc p {body} { elem "p" "$body" }
+proc h1 {body} { elem "h1" "$body" }
+proc h2 {body} { elem "h2" "$body" }
+proc h3 {body} { elem "h3" "$body" }
+proc ul {body} { elem "ul" "$body" }
+proc ol {body} { elem "ol" "$body" }
+proc li {body} { elem "li" "$body" }
+proc table {body} { elem "table" "$body" }
+proc tr {body} { elem "tr" "$body" }
+proc td {body} { elem "td" "$body" }
+proc section {body} { elem "section" "$body" }
+proc main {body} { elem "main" "$body" }
+proc header {body} { elem "header" "$body" }
+proc footer {body} { elem "footer" "$body" }
+proc nav {body} { elem "nav" "$body" }
+proc button {body} { elem "button" "$body" }
+proc br {} { elem "br" "" }
+proc hr {} { elem "hr" "" }
+proc class {name} { attr "class" "$name" }
+proc id {name} { attr "id" "$name" }
+proc data {key; val} { attr "data-$key" "$val" }
+proc on_click {body} { on "click" "$body" }
+proc on_input {body} { on "input" "$body" }`;
 
 function runForWeb(code) {
   try {
-    return runWeb(code, createEnvironment(true));
+    const env = { cmds: {}, vars: {}, _state: {}, _stateRefs: new Set() };
+    loadStdLib(env);
+    loadWebLib(env);
+    const scope = createScope();
+    // Load web.kh procs
+    evaluate(parse(WEB_KH), scope, env);
+    // Run user code
+    env._output = evaluate(parse(code), scope, env).join("");
+    return generateHTML(env);
   } catch (e) {
-    console.error("Error running code:", e);
+    console.error("Error:", e);
     return "";
   }
 }
 
-console.log("\n=== Web Library Tests ===\n");
+function assertContains(str, substring, msg) {
+  if (!str.includes(substring))
+    throw new Error(`${msg}: expected to contain "${substring}"`);
+}
+function assertNotContains(str, substring, msg) {
+  if (str.includes(substring))
+    throw new Error(`${msg}: expected NOT to contain "${substring}"`);
+}
 
-// Page
-console.log("--- Page & Route ---\n");
-test("page: define page", () => {
-  const html = runForWeb('page "home" { h1 "" { text "Welcome" } }');
-  assertContains(html, "<h1>Welcome</h1>", "page content");
-});
+let passed = 0, failed = 0;
+function test(name, fn) {
+  try { fn(); passed++; console.log(`  ✓ ${name}`); }
+  catch (e) { failed++; console.log(`  ✗ ${name}: ${e.message}`); }
+}
 
-test("page: multiple pages", () => {
-  const html = runForWeb(
-    'page "home" { text "Home" }\npage "about" { text "About" }',
-  );
-  assertContains(html, "Home", "home page");
-  assertContains(html, "About", "about page");
-});
-
-test("route: map hash to page", () => {
-  const html = runForWeb(
-    'page "home" { text "Home" }\npage "about" { text "About" }\nroute "#/about" "about"',
-  );
-  assertContains(html, "var R=", "routes defined");
-  assertContains(html, '"#/about":"about"', "route mapping");
-});
-
-test("title: set page title", () => {
-  const html = runForWeb('title "My App"\npage "home" { text "Home" }');
-  assertContains(html, "<title>My App</title>", "title");
-});
+console.log("\n=== Web Library Tests (New Architecture) ===\n");
 
 // HTML Tags
-console.log("\n--- HTML Tags ---\n");
-test("div: basic div", () => {
-  const html = runForWeb('page "home" { div "container" { text "Hello" } }');
-  assertContains(html, '<div class="container">Hello</div>', "div");
+console.log("--- HTML Tags ---\n");
+
+test("div: with class via attr block", () => {
+  const html = runForWeb('div { class "container"; text "Hello" }');
+  assertContains(html, '<div class="container">Hello</div>', "div with class");
+});
+
+test("div: with id", () => {
+  const html = runForWeb('div { id "main"; text "Hello" }');
+  assertContains(html, '<div id="main">Hello</div>', "div with id");
+});
+
+test("div: class and id", () => {
+  const html = runForWeb('div { class "app"; id "root"; text "Hello" }');
+  assertContains(html, 'class="app"', "has class");
+  assertContains(html, 'id="root"', "has id");
 });
 
 test("p: paragraph", () => {
-  const html = runForWeb('page "home" { p "text" { text "Paragraph" } }');
+  const html = runForWeb('p { class "text"; text "Paragraph" }');
   assertContains(html, '<p class="text">Paragraph</p>', "p");
 });
 
 test("span: span", () => {
-  const html = runForWeb('page "home" { span "badge" { text "NEW" } }');
+  const html = runForWeb('span { class "badge"; text "NEW" }');
   assertContains(html, '<span class="badge">NEW</span>', "span");
 });
 
-test("h1-h6: headings", () => {
-  const html = runForWeb(
-    'page "home" {\n  h1 "" { text "Title" }\n  h2 "" { text "Subtitle" }\n}',
-  );
+test("h1-h2: headings", () => {
+  const html = runForWeb('div { h1 { text "Title" }; h2 { text "Subtitle" } }');
   assertContains(html, "<h1>Title</h1>", "h1");
   assertContains(html, "<h2>Subtitle</h2>", "h2");
 });
 
-test("button: button element", () => {
-  const html = runForWeb('page "home" { button "" { text "Click" } }');
-  assertContains(html, "<button", "button tag");
-  assertContains(html, ">Click</button>", "button content");
+test("button: basic", () => {
+  const html = runForWeb('button { class "btn"; text "Click" }');
+  assertContains(html, '<button class="btn">Click</button>', "button");
 });
 
-test("button: with class", () => {
-  const html = runForWeb('page "home" { button "primary" { text "Submit" } }');
-  assertContains(html, 'class="primary"', "button class");
-});
-
-test("a: link", () => {
-  const html = runForWeb('page "home" { a "#/about" "link" { text "About" } }');
-  assertContains(html, '<a href="#/about" class="link">About</a>', "link");
+test("a: link with href", () => {
+  const html = runForWeb('a "/about" { class "link"; text "About" }');
+  assertContains(html, 'href="/about"', "href");
+  assertContains(html, 'class="link"', "class");
+  assertContains(html, ">About</a>", "content");
 });
 
 test("ul/li: list", () => {
-  const html = runForWeb(
-    'page "home" {\n  ul "" {\n    li "" { text "Item 1" }\n    li "" { text "Item 2" }\n  }\n}',
-  );
+  const html = runForWeb('ul { li { text "Item 1" }; li { text "Item 2" } }');
   assertContains(html, "<ul>", "ul");
-  assertContains(html, "<li>Item 1</li>", "li");
-  assertContains(html, "<li>Item 2</li>", "li");
+  assertContains(html, "<li>Item 1</li>", "li 1");
+  assertContains(html, "<li>Item 2</li>", "li 2");
 });
 
 test("table/tr/td: table", () => {
-  const html = runForWeb(
-    'page "home" {\n  table "" {\n    tr "" {\n      td "" { text "Cell" }\n    }\n  }\n}',
-  );
+  const html = runForWeb('table { tr { td { text "Cell" } } }');
   assertContains(html, "<table>", "table");
   assertContains(html, "<tr>", "tr");
   assertContains(html, "<td>Cell</td>", "td");
 });
 
-test("input: input element", () => {
-  const html = runForWeb('page "home" { input "" "" "placeholder=Enter" }');
-  assertContains(html, "<input", "input");
-  assertContains(html, "placeholder=Enter", "input attrs");
-});
-
-test("br: line break", () => {
-  const html = runForWeb('page "home" { br }');
+test("br/hr: void elements", () => {
+  const html = runForWeb('div { br; hr }');
   assertContains(html, "<br>", "br");
-});
-
-test("hr: horizontal rule", () => {
-  const html = runForWeb('page "home" { hr }');
   assertContains(html, "<hr>", "hr");
 });
 
-test("section/main/header/footer: semantic tags", () => {
-  const html = runForWeb(
-    'page "home" {\n  section "" { text "Section" }\n  main "" { text "Main" }\n}',
-  );
-  assertContains(html, "<section", "section");
-  assertContains(html, "<main", "main");
+test("section/main/header/footer: semantic", () => {
+  const html = runForWeb('section { main { text "M" }; header { text "H" } }');
+  assertContains(html, "<section>", "section");
+  assertContains(html, "<main>", "main");
+  assertContains(html, "<header>", "header");
+});
+
+// State & Reactivity
+console.log("\n--- State & Reactivity ---\n");
+
+test("state: declares reactive variable", () => {
+  const html = runForWeb('state count "0"\np { text "Count: $count" }');
+  assertContains(html, 'data-bind="count"', "data-bind");
+  assertContains(html, ">0</span>", "initial value");
+});
+
+test("state: bootstrap script", () => {
+  const html = runForWeb('state count "0"\np { text "$count" }');
+  assertContains(html, 'var __s=', "state object");
+  assertContains(html, '__set', "set function");
+});
+
+test("state: non-reactive var not wrapped", () => {
+  const html = runForWeb('set x "hello"\np { text "$x" }');
+  assertNotContains(html, "data-bind", "no data-bind");
+  assertContains(html, ">hello</p>", "substituted");
+});
+
+// Events
+console.log("\n--- Events ---\n");
+
+test("on_click: generates onclick", () => {
+  const html = runForWeb('state count "0"\nbutton { text "+"; on_click { set count "1" } }');
+  assertContains(html, "onclick=", "has onclick");
+  assertContains(html, "__set", "calls __set");
+});
+
+test("on_click: with expr", () => {
+  const html = runForWeb('state count "0"\nbutton { text "+"; on_click { set count expr "$count + 1" } }');
+  assertContains(html, "onclick=", "has onclick");
+  assertContains(html, "eval(", "evaluates expr");
 });
 
 // Style
 console.log("\n--- Style ---\n");
-test("style: adds to CSS", () => {
-  const html = runForWeb('page "home" {\n  div "container" { text "Test" }\n}');
-  // Note: style command has issues with single-line input
-  // Basic page rendering works
-  assertContains(html, '<div class="container">Test</div>', "page renders");
+
+test("style: generates CSS", () => {
+  const html = runForWeb('style { ".app" { padding 24px; background "#000" } }');
+  assertContains(html, ".app {", "selector");
+  assertContains(html, "padding: 24px;", "property");
+  assertContains(html, "background:", "has background");
 });
 
-// Include
-console.log("\n--- Include ---\n");
-test("include: non-existent file (graceful failure)", () => {
-  const html = runForWeb(
-    'include "./nonexistent.kh"\npage "home" { text "Home" }',
-  );
-  assertContains(html, "Home", "page still renders");
+// Nesting
+console.log("\n--- Nesting ---\n");
+
+test("nested elements", () => {
+  const html = runForWeb('div { class "wrap"; h1 { text "Title" }; p { class "desc"; text "Hello" } }');
+  assertContains(html, '<div class="wrap"><h1>Title</h1><p class="desc">Hello</p></div>', "nested");
 });
 
-// Default CSS
-console.log("\n--- Default CSS ---\n");
-test("default CSS: design system variables", () => {
-  const html = runForWeb('page "home" { text "Home" }');
-  assertContains(html, "--bg:", "background variable");
-  assertContains(html, "--fg:", "foreground variable");
-  assertContains(html, "--mono:", "mono font");
-  assertContains(html, "--serif:", "serif font");
+test("deeply nested", () => {
+  const html = runForWeb('div { class "a"; div { class "b"; span { class "c"; text "deep" } } }');
+  assertContains(html, '<div class="a"><div class="b"><span class="c">deep</span></div></div>', "deep nesting");
 });
 
-test("default CSS: base styles", () => {
-  const html = runForWeb('page "home" { text "Home" }');
-  assertContains(html, "body {", "body styles");
-  assertContains(html, "button {", "button styles");
-  assertContains(html, "a {", "link styles");
-});
-
-// Combined examples
+// Integration
 console.log("\n--- Integration ---\n");
-test("complete app: counter with buttons", () => {
+
+test("counter app", () => {
   const html = runForWeb(`
-    title "Counter"
-    set count 0
-
-    page "home" {
-      style {
-        ".app" { padding 24px; }
-        ".count" { font-size 72px; }
-      }
-      div "app" {
-        p "count" { text $count }
-        button "" { text "-" }
-        button "" { text "+" }
-      }
+    state count "0"
+    div { class "app";
+      p { text "Count: $count" };
+      button { class "btn"; text "+"; on_click { set count expr "$count + 1" } };
+      button { class "btn"; text "-"; on_click { set count expr "$count - 1" } }
     }
-
-    route "#/" "home"
   `);
-  assertContains(html, "<title>Counter</title>", "title");
-  assertContains(html, '<p class="count">', "count display");
+  assertContains(html, 'class="app"', "app div");
+  assertContains(html, 'data-bind="count"', "count binding");
+  assertContains(html, "onclick=", "buttons have onclick");
+  assertContains(html, 'class="btn"', "button classes");
 });
 
-test("multi-page: home with navigation", () => {
-  const html = runForWeb(`
-    page "home" {
-      h1 "" { text "Welcome" }
-      ul "" {
-        li "" { a "#/counter" "" { text "Counter" } }
-        li "" { a "#/about" "" { text "About" } }
-      }
-    }
-
-    page "about" {
-      div "about-page" {
-        h1 "" { text "About" }
-        p "" { text "Built with Khem!" }
-      }
-    }
-
-    route "#/" "home"
-    route "#/about" "about"
-    route "#/counter" "counter"
-  `);
-  assertContains(html, '"#/about":"about"', "about route");
-  assertContains(html, '"#/counter":"counter"', "counter route");
-});
-
-// Error handling
-console.log("\n--- Error Handling ---\n");
-test("unknown command: graceful handling", () => {
-  const html = runForWeb('page "home" { text "Home" }');
-  // Should not throw, page should render
-  assertContains(html, "Home", "page renders");
-});
-
-test("empty page: renders empty", () => {
-  const html = runForWeb('page "home" { }');
+test("full HTML document", () => {
+  const html = runForWeb('div { text "Hello" }');
+  assertContains(html, "<!DOCTYPE html>", "doctype");
+  assertContains(html, '<meta charset="UTF-8">', "charset");
   assertContains(html, '<div id="app">', "app div");
+  assertContains(html, "<style>", "style block");
 });
 
 console.log(
