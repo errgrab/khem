@@ -1,4 +1,5 @@
-# test_match.kh — Debug match command
+# test_match.kh — Pattern matching test
+# Uses evaluator path (no state) so match works
 
 proc testMatch { op } {
   match $op {
@@ -9,12 +10,14 @@ proc testMatch { op } {
 }
 
 div { class "app";
+  h2 { text "Pattern Matching" };
   p { text [testMatch "+"] };
   p { text [testMatch "-"] };
   p { text [testMatch "x"] }
 }
 
 style {
-  .app { padding 2rem; font-size 14px }
-  p { margin 4px 0 }
+  .app { padding 2rem; max-width 400px }
+  h2 { font-family var(--serif); font-size 20px; margin-bottom 12px }
+  p { margin 4px 0; color var(--fg1) }
 }

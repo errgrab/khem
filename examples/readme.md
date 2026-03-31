@@ -1,119 +1,79 @@
 # Khem Examples
 
-Runnable examples covering the full language surface. Each file is self-contained — no imports required.
-
----
+Runnable examples covering the language surface. Each file is self-contained — no imports required.
 
 ## Run any example
 
 ```bash
-khem serve examples/<name>.kh
+node bin/khem.js serve examples/<name>.kh
 # then open http://localhost:4173
 ```
 
 Or compile to static HTML:
 
 ```bash
-khem build examples/<name>.kh > /tmp/<name>.html
+node bin/khem.js build examples/<name>.kh > output.html
 ```
-
----
 
 ## Index
 
 ### 🎛 Interactive UI
 
+#### `hello.kh`
+The simplest possible example — a heading and paragraph with styling.
+
 #### `counter.kh`
-A minimal reactive counter with configurable step size.
+A reactive counter with increment, decrement, and reset.
 
-Demonstrates: `state`, `derive`, `match`, reactive `action` blocks, class-based button variants.
-
-```bash
-khem serve examples/counter.kh
-```
-
----
-
-#### `todo.kh`
-A filterable task list — add, complete, and filter tasks by status.
-
-Demonstrates: `state` (list), `push`, `filter`, `foreach`, `derive`, `length`, DOM input via `js`, `dom_on`.
-
-```bash
-khem serve examples/todo.kh
-```
-
----
+Demonstrates: `state`, `on_click`, `set expr`, reactive re-render.
 
 #### `calculator.kh`
-A four-operation calculator with a full button grid.
+A four-operation calculator with a button grid.
 
-Demonstrates: `proc`, `match`, `expr`, `join`, multi-state composition, class variants per key type.
+Demonstrates: `state`, `on_click`, `set expr`, conditional display.
 
-```bash
-khem serve examples/calculator.kh
-```
+#### `todo.kh`
+A task list with add button and static items.
 
----
+Demonstrates: `state`, `on_click`, input fields, styled components.
 
-### 📊 Data & Dashboards
+#### `fizzbuzz.kh`
+Classic FizzBuzz with prev/next navigation.
+
+Demonstrates: `state`, `on_click`, `set expr`, CSS grid.
+
+### 📊 Data & Layout
 
 #### `log-viewer.kh`
-A filterable log feed — level filter chips, per-row colour coding, live entry count.
+A static event log with level-coded entries and filter chips.
 
-Demonstrates: `foreach`, `match`, `filter`, `split`, `find`, `starts-with`, `derive`, list literals, `style` inline colour binding.
-
-```bash
-khem serve examples/log-viewer.kh
-```
-
----
-
-### 🛠 Real-World Mini-Apps
+Demonstrates: CSS grid, semantic color classes, dark-theme styling.
 
 #### `invoice.kh`
-A static invoice layout with auto-computed subtotal, VAT, and total.
+A static invoice layout with parties, line items, and totals.
 
-Demonstrates: `proc` (reusable row component), `foreach`, `derive`, `split`, `find`, `expr`, `today`, multi-column CSS grid layout.
+Demonstrates: `set` variables, CSS grid, typography hierarchy.
 
-```bash
-khem serve examples/invoice.kh
-```
+### 👤 Profile & Cards
 
----
+#### `profile.kh`
+A minimal profile card with name, role, and year.
+
+Demonstrates: `set` variables, `text "$var"` substitution.
 
 #### `profile-card.kh`
-A live-preview profile editor — edit fields on the left, card updates on the right. State is persisted to localStorage.
+A styled profile card with avatar, bio, and metadata.
 
-Demonstrates: `state` + `persist`, `derive` (computed initials and slug), `dom_on`, `js`, `replace`, `lower`, `split`, reactive re-render, `style` inline accent colour.
-
-```bash
-khem serve examples/profile-card.kh
-```
-
----
+Demonstrates: `set` variables, `style {}` block, CSS variables.
 
 ### 📖 Language Reference
 
 #### `stdlib-tour.kh`
-A runnable cheat-sheet for every stdlib primitive — each command is shown with its live output.
+A cheat-sheet for stdlib commands — math, strings, control flow, procedures.
 
-Demonstrates: all math, string, list, date, control-flow, pattern-matching, proc, try/catch, and derive commands in one document.
+Demonstrates: `set`, `text [fn args]`, `proc`, `match`, math/string/comparison functions.
 
-```bash
-khem serve examples/stdlib-tour.kh
-```
+#### `test_match.kh`
+Pattern matching test with different cases.
 
----
-
-## What each example covers
-
-| Example          | `state` | `derive` | `proc` | `foreach` | `match` | `persist` | DOM events |
-|------------------|:-------:|:--------:|:------:|:---------:|:-------:|:---------:|:----------:|
-| counter          | ✓       | ✓        |        |           | ✓       |           |            |
-| todo             | ✓       | ✓        |        | ✓         |         |           | ✓          |
-| calculator       | ✓       |          | ✓      |           | ✓       |           |            |
-| log-viewer       | ✓       | ✓        |        | ✓         | ✓       |           |            |
-| invoice          |         | ✓        | ✓      | ✓         |         |           |            |
-| profile-card     | ✓       | ✓        | ✓      |           |         | ✓         | ✓          |
-| stdlib-tour      | ✓       | ✓        | ✓      | ✓         | ✓       |           |            |
+Demonstrates: `proc`, `match`, default case.

@@ -1,96 +1,43 @@
 # stdlib-tour.kh — Demonstrates built-in commands
-
-proc section { title } {
-  h2 { class "section-title"; text "$title" }
-}
-
-proc row2 { label value } {
-  div { class "demo-row";
-    span { class "demo-label"; text "$label" };
-    span { class "demo-value"; text "$value" }
-  }
-}
+# Uses evaluator path (no state) so stdlib functions work
 
 div { class "page";
-  section "Variables & Types";
+  h2 { class "section-title"; text "Variables" };
   div { class "group";
     set name "khem";
-    set version 2;
-    row2 "set name" "$name";
-    row2 "set version" "$version"
+    set version "2";
+    div { class "demo-row"; span { class "demo-label"; text "set name" }; span { class "demo-value"; text "$name" } };
+    div { class "demo-row"; span { class "demo-label"; text "set version" }; span { class "demo-value"; text "$version" } }
   };
 
-  section "Expressions (expr)";
+  h2 { class "section-title"; text "Math" };
   div { class "group";
-    set a 7;
-    set b 3;
-    row2 "expr a + b" [expr "$a + $b"];
-    row2 "expr a * b" [expr "$a * $b"];
-    row2 "expr a > b" [expr "$a > $b"];
-    row2 "expr a == 7" [expr "$a == 7"]
+    div { class "demo-row"; span { class "demo-label"; text "abs -9" }; span { class "demo-value"; text [abs -9] } };
+    div { class "demo-row"; span { class "demo-label"; text "floor 4.9" }; span { class "demo-value"; text [floor 4.9] } };
+    div { class "demo-row"; span { class "demo-label"; text "ceil 4.1" }; span { class "demo-value"; text [ceil 4.1] } };
+    div { class "demo-row"; span { class "demo-label"; text "round 4.5" }; span { class "demo-value"; text [round 4.5] } }
   };
 
-  section "Math";
+  h2 { class "section-title"; text "Strings" };
   div { class "group";
-    row2 "abs -9" [abs -9];
-    row2 "floor 4.9" [floor 4.9];
-    row2 "ceil 4.1" [ceil 4.1];
-    row2 "round 4.5" [round 4.5]
+    set s "hello";
+    div { class "demo-row"; span { class "demo-label"; text "upper" }; span { class "demo-value"; text [upper $s] } };
+    div { class "demo-row"; span { class "demo-label"; text "lower" }; span { class "demo-value"; text [lower $s] } };
+    div { class "demo-row"; span { class "demo-label"; text "trim" }; span { class "demo-value"; text [trim "  spaces  "] } }
   };
 
-  section "Strings";
+  h2 { class "section-title"; text "Control Flow" };
   div { class "group";
-    set s "  Hello, World!  ";
-    row2 "trim" [trim $s];
-    row2 "upper" [upper $s];
-    row2 "lower" [lower $s]
+    div { class "demo-row"; span { class "demo-label"; text "eq 5 5" }; span { class "demo-value"; text [eq 5 5] } };
+    div { class "demo-row"; span { class "demo-label"; text "gt 9 5" }; span { class "demo-value"; text [gt 9 5] } };
+    div { class "demo-row"; span { class "demo-label"; text "lte 3 3" }; span { class "demo-value"; text [lte 3 3] } };
+    div { class "demo-row"; span { class "demo-label"; text "not 0" }; span { class "demo-value"; text [not 0] } }
   };
 
-  section "Lists";
+  h2 { class "section-title"; text "Procedures" };
   div { class "group";
-    set xs [list 4 2 8 1 5];
-    row2 "list" "$xs";
-    row2 "llength" [llength $xs];
-    row2 "lindex 2" [lindex $xs 2]
-  };
-
-  section "Control Flow";
-  div { class "group";
-    row2 "eq 5 5" [eq 5 5];
-    row2 "gt 9 5" [gt 9 5];
-    row2 "lte 3 3" [lte 3 3];
-    row2 "not 0" [not 0]
-  };
-
-  section "Pattern Matching";
-  div { class "group";
-    proc demo_match { v } {
-      match $v {
-        "a" { text "alpha" }
-        "b" { text "beta" }
-        default { text "other" }
-      }
-    };
-    row2 "match a" [demo_match "a"];
-    row2 "match b" [demo_match "b"];
-    row2 "match z" [demo_match "z"]
-  };
-
-  section "Procedures";
-  div { class "group";
-    proc greet { name } {
-      text "Hello, $name!"
-    };
-    row2 "greet Erik" [greet "Erik"]
-  };
-
-  section "Error Handling";
-  div { class "group";
-    try {
-      throw "test error"
-    } catch {
-      row2 "caught" "$error"
-    }
+    proc greet { who } { text "Hello, World!" };
+    div { class "demo-row"; span { class "demo-label"; text "greet" }; span { class "demo-value"; text [greet] } }
   }
 }
 
