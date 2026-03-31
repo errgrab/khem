@@ -114,13 +114,15 @@ console.log("\n--- State & Reactivity ---\n");
 
 test("state: declares variable", () => {
   const html = runForWeb('state count "0"\np { text "Count: $count" }');
-  assertContains(html, ">Count: 0</p>", "substituted value");
+  assertContains(html, '__s["count"]', "state variable in render");
+  assertContains(html, "Count:", "text content");
 });
 
 test("state: bootstrap script", () => {
   const html = runForWeb('state count "0"\np { text "$count" }');
   assertContains(html, 'var __s=', "state object");
-  assertContains(html, '__render', "render function");
+  assertContains(html, 'function render()', "render function");
+  assertContains(html, '__r()', "re-render function");
 });
 
 test("state: non-reactive var also substituted", () => {
@@ -141,7 +143,7 @@ test("on_click: with expr", () => {
   const html = runForWeb('state count "0"\nbutton { text "+"; on_click { set count expr "$count + 1" } }');
   assertContains(html, "onclick=", "has onclick");
   assertContains(html, "eval(", "evaluates expr");
-  assertContains(html, "__render()", "triggers render");
+  assertContains(html, "__r()", "triggers render");
 });
 
 // Style
@@ -179,10 +181,10 @@ test("counter app", () => {
       button { class "btn"; text "-"; on_click { set count expr "$count - 1" } }
     }
   `);
-  assertContains(html, 'class="app"', "app div");
-  assertContains(html, "Count: 0", "count value");
+  assertContains(html, 'class=\\"app\\"', "app div in render");
+  assertContains(html, "Count:", "count label");
   assertContains(html, "onclick=", "buttons have onclick");
-  assertContains(html, 'class="btn"', "button classes");
+  assertContains(html, 'class=\\"btn\\"', "button classes");
 });
 
 test("full HTML document", () => {

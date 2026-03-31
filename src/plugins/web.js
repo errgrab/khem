@@ -1,5 +1,6 @@
 import { parse } from "../core/parser.js";
 import { evaluate, createScope } from "../core/engine.js";
+import { compile } from "../compiler.js";
 
 // --- CSS parser (khem syntax → CSS) ---
 function parseCSS(src, env) {
@@ -15,42 +16,6 @@ function parseCSS(src, env) {
       })
       .join("\n") + "\n";
   return fmt(src);
-}
-
-// --- Khem → JS compiler (for event handlers) ---
-function compileToJS(commands, env, rawAST) {
-  const lines = [];
-  for (let ci = 0; ci < commands.length; ci++) {
-    const cmd = commands[ci];
-    if (!Array.isArray(cmd) || cmd.length === 0) continue;
-    const name = cmd[0];
-    const args = cmd.slice(1);
-
-    if (name === "set") {
-      const key = typeof args[0] === "string" ? args[0] : "";
-      const rawCmd = rawAST && rawAST[ci] ? rawAST[ci] : cmd;
-      const rawArgs = rawCmd.slice(1);
-
-      if (args[1] === "expr" && typeof args[2] === "string") {
-        const rawExpr = typeof rawArgs[2] === "string" ? rawArgs[2] : args[2];
-        const jsExpr = rawExpr.replace(
-          /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
-          (_, n) => `Number(__s[${JSON.stringify(n)}])`
-        );
-        lines.push(`__s[${JSON.stringify(key)}]=String((function(){try{return eval(${JSON.stringify(jsExpr)})}catch{return 0}})())`);
-      } else {
-        const val = args[1];
-        const valJS = typeof val === "string" ? JSON.stringify(val) : `""`;
-        lines.push(`__s[${JSON.stringify(key)}]=${valJS}`);
-      }
-    } else {
-      const argStrs = args.map(a =>
-        typeof a === "string" ? JSON.stringify(a) : `""`
-      );
-      lines.push(`(${name})(${argStrs.join(", ")})`);
-    }
-  }
-  return lines.join("; ");
 }
 
 export function loadWebLib(env) {
@@ -122,7 +87,21 @@ export function loadWebLib(env) {
   c["on"] = ([event, body]) => {
     const bodyStr = typeof body === "string" ? body : "";
     const bodyAST = parse(bodyStr);
-    const js = compileToJS(bodyAST, env, bodyAST) + ";__render()";
+    const lines = [];
+    for (const cmd of bodyAST) {
+      if (!Array.isArray(cmd) || cmd.length === 0) continue;
+      if (cmd[0] === "set") {
+        const key = cmd[1] || "";
+        if (cmd[2] === "expr" && typeof cmd[3] === "string") {
+          const e = cmd[3].replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (_, n) => `Number(__s[${JSON.stringify(n)}])`);
+          lines.push(`__s[${JSON.stringify(key)}]=String((function(){try{return eval(${JSON.stringify(e)})}catch{return 0}})())`);
+        } else {
+          lines.push(`__s[${JSON.stringify(key)}]=${JSON.stringify(cmd[2] ?? "")}`);
+        }
+      }
+    }
+    lines.push("__render()");
+    const js = lines.join(";");
     if (env._elemEvents) { env._elemEvents[event] = js; return null; }
     return ` on${event}='${js}'`;
   };
@@ -148,6 +127,11 @@ export function loadWebLib(env) {
     if (src) ctx.styles.push(parseCSS(src, env));
     return null;
   };
+
+  // page/route/title — no-ops for backward compat
+  c["page"] = () => null;
+  c["route"] = () => null;
+  c["title"] = () => null;
 
   // --- Register HTML tag commands directly ---
   const blockTags = [
@@ -199,42 +183,82 @@ export function loadWebLib(env) {
   c["on_keydown"] = ([body]) => c["on"](["keydown", body]);
 }
 
+// --- Style CSS for the generated page ---
+const DEFAULT_CSS = `:root {
+  --bg: #0a0a0a; --s0: #101010; --s1: #161616; --s2: #1e1e1e; --s3: #262626;
+  --border: #272727; --b2: #333333;
+  --fg: #d4d0c8; --fg1: #aaaaaa; --fg2: #888888; --fg3: #555555; --dim: #484848;
+  --acc: #c8a84b; --acc-dim: #7a6628;
+  --green: #6b9e78; --green-dim: #2a4a33; --red: #a86b6b; --red-dim: #4a2222;
+  --blue: #7a8fa8; --blue-dim: #2a3a4a; --amber: #d4924a;
+  --mono: 'DM Mono', 'Fira Mono', ui-monospace, monospace;
+  --serif: 'Instrument Serif', Georgia, serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--mono);
+  font-size: 12px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  padding: 24px; min-height: 100vh; display: flex;
+  justify-content: center; align-items: flex-start;
+}
+#app { width: 100%; max-width: 800px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: normal; }
+p { color: var(--fg1); }
+a { color: var(--acc); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button {
+  background: transparent; border: 1px solid var(--border); color: var(--fg2);
+  padding: 4px 12px; cursor: pointer; font-family: inherit; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em; transition: all 0.15s;
+}
+button:hover { border-color: var(--b2); color: var(--fg); }
+.field {
+  background: var(--s1); border: 1px solid var(--border); color: var(--fg);
+  padding: 8px 10px; font-family: inherit; font-size: 12px; outline: none;
+}
+.field:focus { border-color: var(--acc); }
+`;
+
 export function generateHTML(env) {
   const webCtx = env._webCtx || { styles: [] };
   const state = env._state || {};
   const styles = webCtx.styles.join("\n");
   const body = env._output || "";
 
+  // Use compiler if we have state (reactive mode)
   const stateKeys = Object.keys(state);
-  let bootScript = "";
+  if (stateKeys.length > 0 && env._source) {
+    // Compile the source to get pure JS
+    const ast = parse(env._source);
+    const result = compile(ast, env);
+    const allCSS = DEFAULT_CSS + "\n" + result.css;
 
-  if (stateKeys.length > 0) {
-    const srcEscaped = (env._source || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n");
-
-    bootScript = `
-var __s=${JSON.stringify(state)};
-var __src='${srcEscaped}';
-function __render(){
-var _env=khem.createEnvironment(true);
-_env._state=__s;
-var _scope=khem.createScope();_scope.vars=__s;
-var __ast=khem.parse(__src);
-document.getElementById('app').innerHTML=khem.evaluate(__ast,_scope,_env).join('');
-}
-`;
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${allCSS}</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>${result.js}</script>
+</body>
+</html>`;
   }
 
+  // Non-reactive mode (no state) — use evaluated output directly
+  const allCSS = DEFAULT_CSS + "\n" + styles;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>${styles}</style>
+  <style>${allCSS}</style>
 </head>
 <body>
   <div id="app">${body}</div>
-  ${stateKeys.length > 0 ? `<script src="khem-runtime.js"></script>` : ""}
-  ${bootScript ? `<script>${bootScript}</script>` : ""}
 </body>
 </html>`;
 }
