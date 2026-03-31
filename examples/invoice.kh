@@ -1,267 +1,113 @@
-# invoice.kh
-# Demonstrates: proc (reusable components), derive, foreach, math helpers,
-# state, format-date — a static invoice layout with computed totals.
+# invoice.kh — Static invoice layout
+set inv_number "INV-2024-031"
+set from_name "Khem Studio"
+set client_name "Acme Corp."
 
-set inv_number  "INV-2024-031"
-set inv_date    today
-set due_date    "2026-04-25"
-
-set from_name   "Khem Studio"
-set from_email  "hello@khem.dev"
-set from_addr   "Lisbon, Portugal"
-
-set client_name  "Acme Corp."
-set client_email "billing@acme.example"
-set client_addr  "San Francisco, CA"
-
-# Line items: list of "description|qty|unit_price"
-set items list \
-  "Brand identity design|1|1800" \
-  "UI component library|3|420" \
-  "Accessibility audit|1|650" \
-  "Monthly retainer (Apr)|1|1200"
-
-set tax_rate 0.23   # 23% VAT
-
-derive subtotal {
-  set _s 0
-  foreach item $items {
-    set parts split $item "|"
-    set qty   find $parts 1
-    set price find $parts 2
-    set _s expr "$_s + ($qty * $price)"
-  }
-  emit _s
+div { class "page";
+  div { class "header";
+    span { class "logo"; text "$from_name" };
+    div { class "inv-meta";
+      p { class "inv-num"; text "$inv_number" };
+      p { class "meta-line"; text "Issued: 2026-03-31" };
+      p { class "meta-line"; text "Due: 2026-04-25" };
+      span { class "status-badge"; text "Unpaid" }
+    }
+  };
+  div { class "parties";
+    div { class "party";
+      p { class "party-label"; text "From" };
+      p { class "party-name"; text "$from_name" };
+      p { class "party-detail"; text "hello@khem.dev" }
+    };
+    div { class "party";
+      p { class "party-label"; text "Bill To" };
+      p { class "party-name"; text "$client_name" };
+      p { class "party-detail"; text "billing@acme.example" }
+    }
+  };
+  div { class "table";
+    div { class "row row-head";
+      span { class "cell cell-head"; text "Description" };
+      span { class "cell cell-head cell-num"; text "Qty" };
+      span { class "cell cell-head cell-num"; text "Unit" };
+      span { class "cell cell-head cell-num"; text "Total" }
+    };
+    div { class "row";
+      span { class "cell"; text "Brand identity design" };
+      span { class "cell cell-num"; text "1" };
+      span { class "cell cell-num"; text "€1800" };
+      span { class "cell cell-num"; text "€1800" }
+    };
+    div { class "row";
+      span { class "cell"; text "UI component library" };
+      span { class "cell cell-num"; text "3" };
+      span { class "cell cell-num"; text "€420" };
+      span { class "cell cell-num"; text "€1260" }
+    }
+  };
+  div { class "summary";
+    div { class "sum-row";
+      span { class "sum-label"; text "Subtotal" };
+      span { class "sum-value"; text "€3060" }
+    };
+    div { class "sum-row sum-total";
+      span { class "sum-label"; text "Total Due" };
+      span { class "sum-value"; text "€3763.80" }
+    }
+  };
+  p { class "footer"; text "Payment due by 2026-04-25" }
 }
 
-derive tax_amount {
-  expr "$subtotal * $tax_rate"
-}
-
-derive total_due {
-  expr "$subtotal + $tax_amount"
-}
-
-proc line_row { desc qty price } {
-  set line_total expr "$qty * $price"
-  div "row" {
-    span "cell cell-desc" { text "$desc" }
-    span "cell cell-num"  { text "$qty" }
-    span "cell cell-num"  { text "€$price" }
-    span "cell cell-num cell-total" { text "€$line_total" }
+style {
+  .page {
+    max-width 660px
+    margin 40px auto
+    padding 40px
+    border 1px solid var(--border)
+    background var(--s0)
+    display flex
+    flex-direction column
+    gap 32px
   }
-}
-
-document "$inv_number" {
-  style {
-    ".page" {
-      max-width 660px
-      margin "40px auto"
-      padding "40px"
-      border 1px solid var(--border)
-      background var(--s0)
-      display flex
-      flex-direction column
-      gap 32px
-    }
-    ".header" {
-      display flex
-      justify-content space-between
-      align-items flex-start
-    }
-    ".logo" {
-      font-family var(--serif)
-      font-size 28px
-      color var(--fg)
-    }
-    ".inv-meta" {
-      text-align right
-      display flex
-      flex-direction column
-      gap 3px
-    }
-    ".inv-num" {
-      color var(--acc)
-      font-size 13px
-      letter-spacing 0.06em
-    }
-    ".meta-line" {
-      font-size 10px
-      color var(--fg3)
-    }
-    ".parties" {
-      display grid
-      grid-template-columns "1fr 1fr"
-      gap 24px
-    }
-    ".party" {
-      display flex
-      flex-direction column
-      gap 3px
-    }
-    ".party-label" {
-      font-size 9px
-      text-transform uppercase
-      letter-spacing 0.14em
-      color var(--dim)
-      margin-bottom 4px
-    }
-    ".party-name" {
-      color var(--fg)
-      font-size 12.5px
-    }
-    ".party-detail" {
-      color var(--fg3)
-      font-size 10.5px
-    }
-    ".table" {
-      display flex
-      flex-direction column
-      border 1px solid var(--border)
-    }
-    ".row" {
-      display grid
-      grid-template-columns "1fr 48px 80px 88px"
-      padding "7px 12px"
-      border-bottom 1px solid var(--border)
-      align-items baseline
-      gap 8px
-    }
-    ".row:last-child" {
-      border-bottom none
-    }
-    ".row-head" {
-      background var(--s1)
-      border-bottom 1px solid var(--b2)
-    }
-    ".cell" {
-      font-size 11px
-      color var(--fg1)
-    }
-    ".cell-num" {
-      text-align right
-    }
-    ".cell-total" {
-      color var(--fg)
-    }
-    ".cell-head" {
-      font-size 9px
-      text-transform uppercase
-      letter-spacing 0.1em
-      color var(--fg3)
-    }
-    ".summary" {
-      display flex
-      flex-direction column
-      align-items flex-end
-      gap 5px
-    }
-    ".sum-row" {
-      display flex
-      gap 32px
-      font-size 11px
-      color var(--fg2)
-    }
-    ".sum-label" {
-      min-width 80px
-      text-align right
-    }
-    ".sum-value" {
-      min-width 80px
-      text-align right
-    }
-    ".sum-total" {
-      color var(--fg)
-      font-size 13px
-      padding-top 8px
-      border-top 1px solid var(--border)
-      margin-top 4px
-    }
-    ".footer" {
-      font-size 10px
-      color var(--fg3)
-      border-top 1px solid var(--border)
-      padding-top 12px
-      text-align center
-    }
-    ".status-badge" {
-      display inline-flex
-      border 1px solid var(--amber)
-      color var(--amber)
-      font-size 9px
-      padding "1px 8px"
-      text-transform uppercase
-      letter-spacing 0.12em
-      width fit-content
-    }
+  .header { display flex; justify-content space-between; align-items flex-start }
+  .logo { font-family var(--serif); font-size 28px }
+  .inv-meta { text-align right; display flex; flex-direction column; gap 3px }
+  .inv-num { color var(--acc); font-size 13px; letter-spacing 0.06em }
+  .meta-line { font-size 10px; color var(--fg3) }
+  .status-badge {
+    display inline-flex
+    border 1px solid var(--amber)
+    color var(--amber)
+    font-size 9px
+    padding 1px 8px
+    text-transform uppercase
+    letter-spacing 0.12em
+    width fit-content
   }
-
-  div "page" {
-    # Header
-    div "header" {
-      span "logo" { text "$from_name" }
-      div "inv-meta" {
-        p "inv-num" { text "$inv_number" }
-        p "meta-line" { text "Issued: $inv_date" }
-        p "meta-line" { text "Due: $due_date" }
-        span "status-badge" { text "Unpaid" }
-      }
-    }
-
-    # Parties
-    div "parties" {
-      div "party" {
-        p "party-label" { text "From" }
-        p "party-name"  { text "$from_name" }
-        p "party-detail" { text "$from_email" }
-        p "party-detail" { text "$from_addr" }
-      }
-      div "party" {
-        p "party-label" { text "Bill To" }
-        p "party-name"  { text "$client_name" }
-        p "party-detail" { text "$client_email" }
-        p "party-detail" { text "$client_addr" }
-      }
-    }
-
-    # Line items table
-    div "table" {
-      div "row row-head" {
-        span "cell cell-head" { text "Description" }
-        span "cell cell-head cell-num" { text "Qty" }
-        span "cell cell-head cell-num" { text "Unit" }
-        span "cell cell-head cell-num" { text "Total" }
-      }
-
-      foreach item $items {
-        set parts split $item "|"
-        set desc  find $parts 0
-        set qty   find $parts 1
-        set price find $parts 2
-        line_row $desc $qty $price
-      }
-    }
-
-    # Totals
-    div "summary" {
-      div "sum-row" {
-        span "sum-label" { text "Subtotal" }
-        span "sum-value" { text "€$subtotal" }
-      }
-      div "sum-row" {
-        set tax_pct expr "$tax_rate * 100"
-        span "sum-label" { text "VAT ($tax_pct%)" }
-        span "sum-value" { text "€$tax_amount" }
-      }
-      div "sum-row sum-total" {
-        span "sum-label" { text "Total Due" }
-        span "sum-value" { text "€$total_due" }
-      }
-    }
-
-    # Footer
-    p "footer" {
-      text "Payment due by $due_date · Bank transfer · IBAN PT50 0000 0000 0000 0000 0000 0"
-    }
+  .parties { display grid; grid-template-columns 1fr 1fr; gap 24px }
+  .party { display flex; flex-direction column; gap 3px }
+  .party-label { font-size 9px; text-transform uppercase; letter-spacing 0.14em; color var(--dim); margin-bottom 4px }
+  .party-name { font-size 12.5px }
+  .party-detail { color var(--fg3); font-size 10.5px }
+  .table { display flex; flex-direction column; border 1px solid var(--border) }
+  .row {
+    display grid
+    grid-template-columns 1fr 48px 80px 88px
+    padding 7px 12px
+    border-bottom 1px solid var(--border)
+    align-items baseline
+    gap 8px
+    font-size 11px
   }
+  .row:last-child { border-bottom none }
+  .row-head { background var(--s1); border-bottom 1px solid var(--b2) }
+  .cell { color var(--fg1) }
+  .cell-num { text-align right }
+  .cell-head { font-size 9px; text-transform uppercase; letter-spacing 0.1em; color var(--fg3) }
+  .summary { display flex; flex-direction column; align-items flex-end; gap 5px }
+  .sum-row { display flex; gap 32px; font-size 11px; color var(--fg2) }
+  .sum-label { min-width 80px; text-align right }
+  .sum-value { min-width 80px; text-align right }
+  .sum-total { color var(--fg); font-size 13px; padding-top 8px; border-top 1px solid var(--border); margin-top 4px }
+  .footer { font-size 10px; color var(--fg3); border-top 1px solid var(--border); padding-top 12px; text-align center }
 }

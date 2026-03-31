@@ -1,9 +1,24 @@
-document "Profile" {
-    set name "Ada Lovelace"
-    set role "Mathematician"
-    set year "1843"
+# profile.kh — Simple static profile
+set name "Ada Lovelace"
+set role "Mathematician"
+set year "1843"
 
-    h1 { text $name }
-    p { text $role }
-    p { text [concat "Active since " $year] }
+div { class "app";
+  h1 { text "$name" };
+  p { class "role"; text "$role" };
+  p { class "meta"; text "Active since $year" }
+}
+
+style {
+  .app {
+    display flex
+    flex-direction column
+    align-items center
+    justify-content center
+    min-height 100vh
+    gap 0.5rem
+  }
+  h1 { font-family var(--serif); font-size 28px }
+  .role { color var(--acc); font-size 11px; text-transform uppercase; letter-spacing 0.12em }
+  .meta { color var(--fg3); font-size 10px }
 }

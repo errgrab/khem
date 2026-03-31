@@ -1,14 +1,20 @@
-# test_match.kh - Debug match command
+# test_match.kh — Debug match command
+
 proc testMatch { op } {
-  if [eq $op "+"] { puts "Matched + directly" }
-  if [eq $op "-"] { puts "Matched - directly" }
   match $op {
-    "+" { puts "Matched + in match" }
-    "-" { puts "Matched - in match" }
-    default { puts "No match in match" }
+    "+" { text "Matched +" }
+    "-" { text "Matched -" }
+    default { text "No match" }
   }
 }
 
-testMatch +
-testMatch -
-testMatch x
+div { class "app";
+  p { text [testMatch "+"] };
+  p { text [testMatch "-"] };
+  p { text [testMatch "x"] }
+}
+
+style {
+  .app { padding 2rem; font-size 14px }
+  p { margin 4px 0 }
+}

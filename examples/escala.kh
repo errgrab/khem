@@ -1,8 +1,7 @@
 # escala.kh — Calendário de turnos
 # Recriação do escala.html usando Khem
 
-document "Escala" {
-  style {
+style {
     ":root" {
       --bg "#0e0e0e"
       --fg "#e8e0d0"
@@ -685,4 +684,3 @@ document "Escala" {
 
     render();
   }
-}

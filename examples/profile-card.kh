@@ -1,248 +1,86 @@
-# profile-card.kh
-# Demonstrates: state + persist (localStorage), derive, form inputs,
-# reactive re-render, style scoping — a live-preview profile editor.
+# profile-card.kh — Profile card with static data
 
-state name     "Ada Lovelace"
-state role     "Mathematician & Writer"
-state location "London, UK"
-state bio      "Pioneer of computing, author of the first algorithm intended for a mechanical computer."
-state color    "#c8a84b"
-state initials ""
+set name "Ada Lovelace"
+set role "Mathematician & Writer"
+set location "London, UK"
+set bio "Pioneer of computing, author of the first algorithm intended for a mechanical computer."
 
-persist name
-persist role
-persist location
-persist bio
-persist color
-
-derive initials {
-  set words split $name " "
-  set a slice $name 0 1
-  set last find $words -1
-  if "$last" {
-    set b slice $last 0 1
-    join $a $b ""
-  } else {
-    emit $a
-  }
-}
-
-derive slug {
-  set cleaned lower $name
-  replace $cleaned " " "-"
-}
-
-proc field_group { lbl id val } {
-  div "field-group" {
-    label "" { text $lbl }
-    input {
-      id $id
-      placeholder $lbl
+div { class "layout";
+  div { class "card-wrap";
+    div { class "card";
+      div { class "card-accent" };
+      div { class "card-body";
+        div { class "avatar"; text "AL" };
+        div;
+          p { class "card-name"; text "$name" };
+          p { class "card-role"; text "$role" };
+        ;
+        p { class "card-bio"; text "$bio" };
+        div { class "card-meta";
+          span { class "meta-item"; text "$location" }
+        }
+      };
+      p { class "card-footer"; text "@ada-lovelace" }
     }
   }
 }
 
-document "Profile Editor" {
-  style {
-    ".layout" {
-      display grid
-      grid-template-columns "1fr 340px"
-      gap 32px
-      max-width 860px
-      margin "40px auto"
-      align-items start
-    }
-    ".editor" {
-      display flex
-      flex-direction column
-      gap 16px
-    }
-    ".editor-title" {
-      font-size 11px
-      text-transform uppercase
-      letter-spacing 0.14em
-      color var(--fg3)
-      border-bottom 1px solid var(--border)
-      padding-bottom 8px
-      margin-bottom 4px
-    }
-    ".field-group" {
-      display flex
-      flex-direction column
-      gap 4px
-    }
-    ".field-group label" {
-      font-size 9.5px
-      text-transform uppercase
-      letter-spacing 0.1em
-      color var(--fg3)
-    }
-    ".field-group .field" {
-      width 100%
-    }
-    ".color-row" {
-      display flex
-      gap 10px
-      align-items center
-    }
-    ".color-preview" {
-      width 20px
-      height 20px
-      border 1px solid var(--border)
-      flex-shrink 0
-    }
-    ".card-wrap" {
-      position sticky
-      top 40px
-    }
-    ".card" {
-      border 1px solid var(--border)
-      background var(--s1)
-      overflow hidden
-    }
-    ".card-accent" {
-      height 4px
-      background var(--acc)
-    }
-    ".card-body" {
-      padding 24px
-      display flex
-      flex-direction column
-      gap 12px
-    }
-    ".avatar" {
-      width 56px
-      height 56px
-      border-radius 50%
-      background var(--s2)
-      border 1px solid var(--border)
-      display flex
-      align-items center
-      justify-content center
-      font-size 20px
-      font-family var(--serif)
-      color var(--acc)
-    }
-    ".card-name" {
-      font-family var(--serif)
-      font-size 20px
-      color var(--fg)
-    }
-    ".card-role" {
-      font-size 10px
-      text-transform uppercase
-      letter-spacing 0.1em
-      color var(--fg3)
-      margin-top -6px
-    }
-    ".card-bio" {
-      font-size 11px
-      color var(--fg2)
-      line-height 1.7
-      border-top 1px solid var(--border)
-      padding-top 10px
-    }
-    ".card-meta" {
-      display flex
-      gap 16px
-      font-size 10px
-      color var(--fg3)
-    }
-    ".meta-item" {
-      display flex
-      gap 4px
-    }
-    ".card-footer" {
-      font-size 9px
-      color var(--dim)
-      letter-spacing 0.08em
-      border-top 1px solid var(--border)
-      padding 10px 24px
-    }
-    ".actions" {
-      display flex
-      gap 8px
-    }
+style {
+  .layout {
+    display flex
+    justify-content center
+    padding 40px
   }
-
-  script {
-    dom_on "#apply-btn" "click" {
-      set name     js "document.getElementById('f-name').value     || 'Ada Lovelace'"
-      set role     js "document.getElementById('f-role').value     || 'Mathematician'"
-      set location js "document.getElementById('f-location').value || 'London, UK'"
-      set bio      js "document.getElementById('f-bio').value      || ''"
-      set color    js "document.getElementById('f-color').value    || '#c8a84b'"
-    }
-    dom_on "#reset-btn" "click" {
-      set name "Ada Lovelace"
-      set role "Mathematician & Writer"
-      set location "London, UK"
-      set bio "Pioneer of computing, author of the first algorithm intended for a mechanical computer."
-      set color "#c8a84b"
-    }
+  .card-wrap { max-width 340px }
+  .card {
+    border 1px solid var(--border)
+    background var(--s1)
+    overflow hidden
   }
-
-  div "layout" {
-
-    # Left: editor form
-    div "editor" {
-      p "editor-title" { text "Edit Profile" }
-
-      div "field-group" {
-        label "" { text "Name" }
-        input { id "f-name"; placeholder "Full name" }
-      }
-      div "field-group" {
-        label "" { text "Role / Title" }
-        input { id "f-role"; placeholder "Role or title" }
-      }
-      div "field-group" {
-        label "" { text "Location" }
-        input { id "f-location"; placeholder "City, Country" }
-      }
-      div "field-group" {
-        label "" { text "Bio" }
-        input { id "f-bio"; placeholder "Short bio" }
-      }
-      div "field-group" {
-        label "" { text "Accent colour" }
-        div "color-row" {
-          input { id "f-color"; placeholder "#c8a84b"; class "field" }
-          div "color-preview" { text "" }
-        }
-      }
-
-      div "actions" {
-        button {
-          text "Apply"
-          id "apply-btn"
-        }
-        button {
-          text "Reset"
-          id "reset-btn"
-        }
-      }
-    }
-
-    # Right: live preview card
-    div "card-wrap" {
-      div "card" {
-        style { background $color } {
-          div "card-accent" { text "" }
-        }
-        div "card-body" {
-          div "avatar" { text "$initials" }
-          div "" {
-            p "card-name" { text "$name" }
-            p "card-role" { text "$role" }
-          }
-          p "card-bio"  { text "$bio" }
-          div "card-meta" {
-            span "meta-item" { text "📍 $location" }
-          }
-        }
-        p "card-footer" { text "@$slug" }
-      }
-    }
+  .card-accent {
+    height 4px
+    background var(--acc)
+  }
+  .card-body {
+    padding 24px
+    display flex
+    flex-direction column
+    gap 12px
+  }
+  .avatar {
+    width 56px
+    height 56px
+    border-radius 50%
+    background var(--s2)
+    border 1px solid var(--border)
+    display flex
+    align-items center
+    justify-content center
+    font-size 20px
+    font-family var(--serif)
+    color var(--acc)
+  }
+  .card-name { font-family var(--serif); font-size 20px }
+  .card-role {
+    font-size 10px
+    text-transform uppercase
+    letter-spacing 0.1em
+    color var(--fg3)
+    margin-top -6px
+  }
+  .card-bio {
+    font-size 11px
+    color var(--fg2)
+    line-height 1.7
+    border-top 1px solid var(--border)
+    padding-top 10px
+  }
+  .card-meta { display flex; gap 16px; font-size 10px; color var(--fg3) }
+  .card-footer {
+    font-size 9px
+    color var(--dim)
+    letter-spacing 0.08em
+    border-top 1px solid var(--border)
+    padding 10px 24px
   }
 }

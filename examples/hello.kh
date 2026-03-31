@@ -1,4 +1,15 @@
-document "Hello" {
-    h1 { text "Hello, Khem!" }
-    p { text "The black land speaks." }
+# hello.kh — Simplest possible example
+div { class "app"; h1 { text "Hello, Khem!" }; p { text "The black land speaks." } }
+
+style {
+  .app {
+    display flex
+    flex-direction column
+    align-items center
+    justify-content center
+    min-height 100vh
+    gap 1rem
+  }
+  h1 { font-family var(--serif); font-size 28px }
+  p { color var(--fg2); font-size 12px }
 }

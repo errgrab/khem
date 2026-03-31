@@ -1,89 +1,65 @@
-# todo.kh - Simple todo list
-title "Todo"
+# todo.kh — Simple reactive todo list
+state count "3"
 
-state filter_mode "all"
-
-page "home" {
-  style {
-    ".app" {
-      max-width: 440px;
-      margin: 40px auto;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    ".header" {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 0 0 12px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    ".title" {
-      font-family: var(--serif);
-      font-size: 20px;
-      color: var(--fg);
-    }
-    ".count" {
-      font-size: 9.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--fg3);
-    }
-    ".add-row" {
-      display: flex;
-      gap: 8px;
-    }
-    ".item" {
-      display: flex;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-      gap: 8px;
-    }
-    ".item-text" {
-      flex: 1;
-      font-size: 12px;
-      color: var(--fg1);
-    }
-    ".filter-row" {
-      display: flex;
-      gap: 6px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-  }
-
-  div "app" {
-    div "header" {
-      span "title" { text "Tasks" }
-      span "count" { text "3 items" }
-    }
-
-    div "add-row" {
-      input placeholder "Add a task..." class "add-input"
-      button { text "Add" }
-    }
-
-    div "item" {
-      span "item-text" { text "Buy milk" }
-      button { text "×" }
-    }
-    div "item" {
-      span "item-text" { text "Call John" }
-      button { text "×" }
-    }
-    div "item" {
-      span "item-text" { text "Finish report" }
-      button { text "×" }
-    }
-
-    div "filter-row" {
-      button { text "All" }
-      button { text "Active" }
-      button { text "Done" }
-    }
+div { class "app";
+  div { class "header";
+    span { class "title"; text "Tasks" };
+    span { class "count"; text "$count items" }
+  };
+  div { class "add-row";
+    input { class "add-input"; placeholder "Add a task..." };
+    button { text "Add"; on_click { set count expr "$count + 1" } }
+  };
+  div { class "item"; span { class "item-text"; text "Buy milk" }; button { text "×" } };
+  div { class "item"; span { class "item-text"; text "Call John" }; button { text "×" } };
+  div { class "item"; span { class "item-text"; text "Finish report" }; button { text "×" } };
+  div { class "filter-row";
+    button { text "All" };
+    button { text "Active" };
+    button { text "Done" }
   }
 }
 
-route "#/" "home"
+style {
+  .app {
+    max-width 440px
+    margin 40px auto
+    display flex
+    flex-direction column
+    gap 16px
+  }
+  .header {
+    display flex
+    justify-content space-between
+    align-items baseline
+    padding 0 0 12px 0
+    border-bottom 1px solid var(--border)
+  }
+  .title { font-family var(--serif); font-size 20px }
+  .count { font-size 9.5px; text-transform uppercase; letter-spacing 0.12em; color var(--fg3) }
+  .add-row { display flex; gap 8px }
+  .add-input {
+    flex 1
+    background var(--s1)
+    border 1px solid var(--border)
+    color var(--fg)
+    padding 8px 10px
+    font-family inherit
+    font-size 12px
+    outline none
+  }
+  .item {
+    display flex
+    align-items center
+    padding 8px 0
+    border-bottom 1px solid var(--border)
+    gap 8px
+  }
+  .item-text { flex 1; font-size 12px; color var(--fg1) }
+  .filter-row {
+    display flex
+    gap 6px
+    padding-top 12px
+    border-top 1px solid var(--border)
+  }
+}

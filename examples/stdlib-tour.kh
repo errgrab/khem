@@ -1,132 +1,123 @@
-# stdlib-tour.kh - Demonstrates built-in commands
-title "Khem Stdlib Tour"
+# stdlib-tour.kh — Demonstrates built-in commands
 
 proc section { title } {
-  h2 "section-title" { text $title }
+  h2 { class "section-title"; text "$title" }
 }
 
 proc row2 { label value } {
-  div "demo-row" {
-    span "demo-label" { text $label }
-    span "demo-value" { text $value }
+  div { class "demo-row";
+    span { class "demo-label"; text "$label" };
+    span { class "demo-value"; text "$value" }
   }
 }
 
-page "home" {
-  style {
-    ".page" {
-      max-width: 620px;
-      margin: 32px auto;
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
-    }
-    ".section-title" {
-      font-family: var(--serif);
-      font-size: 16px;
-      color: var(--acc);
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 8px;
-    }
-    ".group { display: flex; flex-direction: column; gap: 2px; }"
-    ".demo-row" {
-      display: grid;
-      grid-template-columns: 180px 1fr;
-      padding: 5px 10px;
-      border-bottom: 1px solid var(--border);
-      font-size: 11px;
-    }
-    ".demo-label { color: var(--fg3); font-size: 10px; }"
-    ".demo-value { color: var(--fg1); }"
-  }
+div { class "page";
+  section "Variables & Types";
+  div { class "group";
+    set name "khem";
+    set version 2;
+    row2 "set name" "$name";
+    row2 "set version" "$version"
+  };
 
-  div "page" {
+  section "Expressions (expr)";
+  div { class "group";
+    set a 7;
+    set b 3;
+    row2 "expr a + b" [expr "$a + $b"];
+    row2 "expr a * b" [expr "$a * $b"];
+    row2 "expr a > b" [expr "$a > $b"];
+    row2 "expr a == 7" [expr "$a == 7"]
+  };
 
-    section "Variables & Types"
-    div "group" {
-      set name "khem"
-      set version 2
-      row2 "set name" $name
-      row2 "set version" $version
-    }
+  section "Math";
+  div { class "group";
+    row2 "abs -9" [abs -9];
+    row2 "floor 4.9" [floor 4.9];
+    row2 "ceil 4.1" [ceil 4.1];
+    row2 "round 4.5" [round 4.5]
+  };
 
-    section "Expressions (expr)"
-    div "group" {
-      set a 7
-      set b 3
-      row2 "expr a + b" [expr "$a + $b"]
-      row2 "expr a * b" [expr "$a * $b"]
-      row2 "expr a > b" [expr "$a > $b"]
-      row2 "expr a == 7" [expr "$a == 7"]
-    }
+  section "Strings";
+  div { class "group";
+    set s "  Hello, World!  ";
+    row2 "trim" [trim $s];
+    row2 "upper" [upper $s];
+    row2 "lower" [lower $s]
+  };
 
-    section "Math"
-    div "group" {
-      row2 "abs -9" [abs -9]
-      row2 "floor 4.9" [floor 4.9]
-      row2 "ceil 4.1" [ceil 4.1]
-      row2 "round 4.5" [round 4.5]
-    }
+  section "Lists";
+  div { class "group";
+    set xs [list 4 2 8 1 5];
+    row2 "list" "$xs";
+    row2 "llength" [llength $xs];
+    row2 "lindex 2" [lindex $xs 2]
+  };
 
-    section "Strings"
-    div "group" {
-      set s "  Hello, World!  "
-      row2 "trim" [trim $s]
-      row2 "upper" [upper $s]
-      row2 "lower" [lower $s]
-      row2 "length" [length $s]
-    }
+  section "Control Flow";
+  div { class "group";
+    row2 "eq 5 5" [eq 5 5];
+    row2 "gt 9 5" [gt 9 5];
+    row2 "lte 3 3" [lte 3 3];
+    row2 "not 0" [not 0]
+  };
 
-    section "Lists"
-    div "group" {
-      set xs [list 4 2 8 1 5]
-      row2 "list" $xs
-      row2 "llength" [llength $xs]
-      row2 "lindex 2" [lindex $xs 2]
-    }
-
-    section "Control Flow"
-    div "group" {
-      row2 "if true" if "1 == 1" { text "yes" } else { text "no" }
-      row2 "if false" if "1 == 2" { text "yes" } else { text "no" }
-      row2 "eq 5 5" [eq 5 5]
-      row2 "gt 9 5" [gt 9 5]
-      row2 "lte 3 3" [lte 3 3]
-    }
-
-    section "Pattern Matching"
-    div "group" {
-      proc demo_match { v } {
-        match $v {
-          "a" { text "alpha" }
-          "b" { text "beta" }
-          default { text "other" }
-        }
+  section "Pattern Matching";
+  div { class "group";
+    proc demo_match { v } {
+      match $v {
+        "a" { text "alpha" }
+        "b" { text "beta" }
+        default { text "other" }
       }
-      row2 "match a" [demo_match "a"]
-      row2 "match b" [demo_match "b"]
-      row2 "match z" [demo_match "z"]
-    }
+    };
+    row2 "match a" [demo_match "a"];
+    row2 "match b" [demo_match "b"];
+    row2 "match z" [demo_match "z"]
+  };
 
-    section "Procedures"
-    div "group" {
-      proc greet { name } {
-        return [join "Hello, " $name "!"]
-      }
-      row2 "greet Erik" [greet "Erik"]
-    }
+  section "Procedures";
+  div { class "group";
+    proc greet { name } {
+      text "Hello, $name!"
+    };
+    row2 "greet Erik" [greet "Erik"]
+  };
 
-    section "Error Handling"
-    div "group" {
-      try {
-        throw "error"
-      } catch {
-        row2 "caught" $error
-      }
+  section "Error Handling";
+  div { class "group";
+    try {
+      throw "test error"
+    } catch {
+      row2 "caught" "$error"
     }
-
   }
 }
 
-route "#/" "home"
+style {
+  .page {
+    max-width 620px
+    margin 32px auto
+    display flex
+    flex-direction column
+    gap 28px
+  }
+  .section-title {
+    font-family var(--serif)
+    font-size 16px
+    color var(--acc)
+    padding-bottom 6px
+    border-bottom 1px solid var(--border)
+    margin-bottom 8px
+  }
+  .group { display flex; flex-direction column; gap 2px }
+  .demo-row {
+    display grid
+    grid-template-columns 180px 1fr
+    padding 5px 10px
+    border-bottom 1px solid var(--border)
+    font-size 11px
+  }
+  .demo-label { color var(--fg3); font-size 10px }
+  .demo-value { color var(--fg1) }
+}
