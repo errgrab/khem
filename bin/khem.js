@@ -20,7 +20,7 @@ const printError = (error, file = "<stdin>") => {
 
 const isWebFile = (code) => {
   return (
-    /^\s*(document|page|route|state|title)\s/m.test(code) ||
+    /^\s*(document|page|route|state|title|style|div|span|p|h[1-6]|button|section|main|header|footer|nav|article|form|ul|ol|table|a|elem)\b/m.test(code) ||
     code.includes('<script type="text/khem">')
   );
 };
@@ -251,23 +251,30 @@ function serveStaticDir(dirPath, port = 4173, host = "127.0.0.1", open = true) {
 }
 
 const runTestSuite = () => {
-  const nodeSuite = spawn(process.execPath, ["tests/node_test.js"], {
+  const parserSuite = spawn(process.execPath, ["tests/parser_test.js"], {
     stdio: "inherit",
     cwd: process.cwd(),
   });
 
-  nodeSuite.on("exit", (code) => {
-    if (code !== 0) {
-      process.exit(code ?? 1);
-      return;
-    }
+  parserSuite.on("exit", (code) => {
+    if (code !== 0) { process.exit(code ?? 1); return; }
 
-    const parserSuite = spawn(process.execPath, ["tests/parser_test.js"], {
+    const stdlibSuite = spawn(process.execPath, ["tests/stdlib_test.js"], {
       stdio: "inherit",
       cwd: process.cwd(),
     });
-    parserSuite.on("exit", (parserCode) => {
-      process.exit(parserCode ?? 1);
+
+    stdlibSuite.on("exit", (code2) => {
+      if (code2 !== 0) { process.exit(code2 ?? 1); return; }
+
+      const webSuite = spawn(process.execPath, ["tests/web_test.js"], {
+        stdio: "inherit",
+        cwd: process.cwd(),
+      });
+
+      webSuite.on("exit", (code3) => {
+        process.exit(code3 ?? 1);
+      });
     });
   });
 };
