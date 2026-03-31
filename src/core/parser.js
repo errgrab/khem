@@ -43,13 +43,25 @@ export function parse(code) {
   };
 
   const readQuoted = () => {
-    eat(); // skip "
+    eat(); // skip opening "
     let s = "";
-    while (!end() && peek() !== '"') {
+    let escaped = false;
+    while (!end()) {
+      if (!escaped && peek() === '"') break;
       const c = eat();
-      s += c === "\\" && !end() ? eat() : c;
+      if (c === "\\" && !escaped) {
+        escaped = true;
+        continue;
+      }
+      if (escaped) {
+        escaped = false;
+        if (c === "n") { s += "\n"; continue; }
+        if (c === "t") { s += "\t"; continue; }
+        // \", \\, etc. → literal char
+      }
+      s += c;
     }
-    if (!end()) eat(); // skip "
+    if (!end()) eat(); // skip closing "
     return s;
   };
 

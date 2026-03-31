@@ -85,20 +85,73 @@ export function loadWebLib(env) {
   const c = env.cmds;
   const ctx = getCtx(env);
 
-  const makeTag = (tag) => (args, scope) => {
-    const { cls, body } = tagArgs(args, scope, env);
-    return `<${tag}${cls}>${body}</${tag}>`;
+  // --- Generic tag builder ---
+
+  // tag "div" "container" { text "hello" }
+  // tag "div" { text "no class" }
+  c["tag"] = (args, scope) => {
+    const name = args[0] ?? "div";
+    const { cls, body } = tagArgs(args.slice(1), scope, env);
+    return `<${name}${cls}>${body}</${name}>`;
   };
 
-  c["title"] = ([t]) => {
-    ctx.title = t ?? "Khem App";
+  // Void elements (self-closing)
+  const voidTags = ["br", "hr", "img", "input", "meta", "link"];
+  voidTags.forEach((t) => {
+    c[t] = () => `<${t}>`;
+  });
+
+  // Normal elements — register as aliases of tag
+  const htmlTags = [
+    "div", "span", "p",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li",
+    "table", "tr", "td", "th",
+    "section", "main", "header", "footer", "nav", "article",
+    "form", "label", "pre", "code", "blockquote", "strong", "em",
+    "button",
+  ];
+  htmlTags.forEach((t) => {
+    c[t] = (args, scope) => {
+      const { cls, body } = tagArgs(args, scope, env);
+      return `<${t}${cls}>${body}</${t}>`;
+    };
+  });
+
+  // Special: <a href="..."> — first arg is href, rest is class+body
+  c["a"] = (args, scope) => {
+    const href = args[0] ?? "#";
+    const { cls, body } = tagArgs(args.slice(1), scope, env);
+    return `<a href="${href}"${cls}>${body}</a>`;
   };
-  c["page"] = ([name, body]) => {
-    ctx.pages[name] = body ?? "";
+
+  // Special: <img src="..." alt="...">
+  c["img"] = ([src = "", alt = ""]) => `<img src="${src}" alt="${alt}">`;
+
+  // Special: <input> with optional id, class, attrs
+  c["input"] = (args) => {
+    let id = "", cls = "field", attrsStr = "";
+    if (args.length === 1) attrsStr = args[0];
+    else if (args.length === 2) { cls = args[0]; attrsStr = args[1]; }
+    else if (args.length >= 3) { id = args[0]; cls = args[1]; attrsStr = args[2]; }
+    const parsedAttrs = attrsStr
+      ? parse(attrsStr).map(([k, ...v]) => v.length ? `${k}="${v.join(" ")}"` : k).join(" ")
+      : "";
+    return `<input${id ? ` id="${id}"` : ""}${cls ? ` class="${cls}"` : ""}${parsedAttrs ? ` ${parsedAttrs}` : ""}>`;
   };
-  c["route"] = ([path, page]) => {
-    ctx.routes[path] = page;
+
+  // --- Document / routing ---
+
+  c["title"] = ([t]) => { ctx.title = t ?? "Khem App"; };
+  c["page"] = ([name, body]) => { ctx.pages[name] = body ?? ""; };
+  c["route"] = ([path, page]) => { ctx.routes[path] = page; };
+  c["document"] = ([title, body]) => {
+    if (title) ctx.title = title;
+    ctx.pages["__doc__"] = body ?? "";
+    ctx.routes["#/"] = "__doc__";
   };
+
+  // --- Style / Script / Include ---
 
   c["style"] = ([src]) => {
     if (!src) return;
@@ -117,31 +170,13 @@ export function loadWebLib(env) {
     ctx.styles.push(fmt(src));
   };
 
-  c["script"] = ([s]) => {
-    if (s) ctx.scripts.push(s);
-  };
+  c["script"] = ([s]) => { if (s) ctx.scripts.push(s); };
   c["text"] = ([t]) => t ?? "";
-
-  c["document"] = ([title, body]) => {
-    if (title) ctx.title = title;
-    ctx.pages["__doc__"] = body ?? "";
-    ctx.routes["#/"] = "__doc__";
-  };
 
   c["include"] = ([file], scope) => {
     if (!file) return;
-    if (!isNode()) {
-      console.warn(
-        `include \"${file}\" skipped — filesystem not available in browser`,
-      );
-      return;
-    }
-    if (!_fs || !_path) {
-      console.error(
-        `include \"${file}\" skipped — Node builtins not yet initialised`,
-      );
-      return;
-    }
+    if (!isNode()) { console.warn(`include "${file}" skipped — browser`); return; }
+    if (!_fs || !_path) { console.error(`include "${file}" skipped — no fs`); return; }
     const base = env._baseDir ?? process.cwd();
     const abs = _path.resolve(base, file);
     if (ctx.includes.has(abs)) return;
@@ -150,83 +185,9 @@ export function loadWebLib(env) {
     try {
       env._baseDir = _path.dirname(abs);
       renderWeb(_fs.readFileSync(abs, "utf8"), scope, env);
-    } catch (e) {
-      console.error(`include error: ${e.message}`);
-    } finally {
-      env._baseDir = prev;
-    }
+    } catch (e) { console.error(`include error: ${e.message}`); }
+    finally { env._baseDir = prev; }
   };
-
-  [
-    "div",
-    "span",
-    "p",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "ul",
-    "ol",
-    "li",
-    "table",
-    "tr",
-    "td",
-    "th",
-    "section",
-    "main",
-    "header",
-    "footer",
-    "nav",
-    "article",
-    "form",
-    "label",
-    "pre",
-    "code",
-    "blockquote",
-    "strong",
-    "em",
-  ].forEach((tag) => {
-    c[tag] = makeTag(tag);
-  });
-
-  c["a"] = (args, scope) => {
-    const href = args[0] ?? "#";
-    const { cls, body } = tagArgs(args.slice(1), scope, env);
-    return `<a href="${href}"${cls}>${body}</a>`;
-  };
-
-  c["button"] = (args, scope) => {
-    const { cls, body } = tagArgs(args, scope, env);
-    return `<button${cls}>${body}</button>`;
-  };
-
-  c["input"] = (args) => {
-    let id = "",
-      cls = "field",
-      attrsStr = "";
-    if (args.length === 1) {
-      attrsStr = args[0];
-    } else if (args.length === 2) {
-      cls = args[0];
-      attrsStr = args[1];
-    } else if (args.length >= 3) {
-      id = args[0];
-      cls = args[1];
-      attrsStr = args[2];
-    }
-    const parsedAttrs = attrsStr
-      ? parse(attrsStr)
-          .map(([k, ...v]) => (v.length ? `${k}="${v.join(" ")}"` : k))
-          .join(" ")
-      : "";
-    return `<input${id ? ` id="${id}"` : ""}${cls ? ` class="${cls}"` : ""}${parsedAttrs ? ` ${parsedAttrs}` : ""}>`;
-  };
-
-  c["br"] = () => "<br>";
-  c["hr"] = () => "<hr>";
-  c["img"] = ([src = "", alt = ""]) => `<img src="${src}" alt="${alt}">`;
 }
 
 export function generateHTML(env) {

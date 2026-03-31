@@ -71,7 +71,7 @@ export function loadStdLib(env) {
         const value =
           argIndex < callArgs.length
             ? callArgs[argIndex++]
-            : (param.default ?? "");
+            : (p.default ?? "");
         local.vars[p.name] = value;
       }
       const result = evaluate(body, local, env);
