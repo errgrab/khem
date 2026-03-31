@@ -39,6 +39,14 @@
 | `\\` | Literal backslash |
 | `\n` | Newline |
 | `\t` | Tab |
+| `\$` | Literal dollar sign (prevents variable substitution) |
+
+```khem
+set price 100
+text "Cost: \$price"              # → Cost: $price (literal)
+text "Total: $price"              # → Total: 100 (substituted)
+text "He said \"hello\""          # → He said "hello"
+```
 
 ## 3. Syntax
 
@@ -188,9 +196,13 @@ When `set name "new"` is called, all `[data-bind="name"]` elements update.
 
 ```khem
 style {
-  ".selector" {
-    property value
-    property value
+  .app {
+    max-width 420px
+    margin 0 auto
+    padding 2rem
+  }
+  .btn:hover {
+    background var(--acc)
   }
 }
 ```

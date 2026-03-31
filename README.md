@@ -31,7 +31,7 @@ Khem has three token types:
 
 ```
 word        — contiguous non-special chars
-"string"    — double-quoted, supports $var substitution, \" escape
+"string"    — double-quoted, supports $var substitution, \" \\ escapes
 {block}     — braced, literal (no substitution), passed as string
 ```
 
@@ -209,18 +209,18 @@ Declares a reactive variable. `$count` in text becomes a DOM binding that auto-u
 
 ```khem
 style {
-  ".app" {
+  .app {
     max-width 420px
-    margin "0 auto"
+    margin 0 auto
     padding 2rem
   }
-  ".btn:hover" {
+  .btn:hover {
     background var(--acc)
   }
 }
 ```
 
-CSS in Khem syntax. Property names and values separated by spaces. Blocks become `{...}` in CSS.
+CSS in Khem syntax. Blocks become `{...}`, commands become `property: value;`.
 
 ## Web Procs (web.kh)
 
@@ -356,11 +356,3 @@ khem/
 ├── examples/             # Example .kh files
 └── docs/                 # Language docs
 ```
-
-## Design Principles
-
-- **Homoiconic**: Code is data. Every statement is a list.
-- **Minimal core**: Parser + engine + 5 web primitives. Everything else is Khem.
-- **No build step required**: Works in browser with `<script type="text/khem">`.
-- **Zero dependencies**: Pure JavaScript, no external packages.
-- **Reactive by default**: `state` + `$var` = automatic DOM updates.

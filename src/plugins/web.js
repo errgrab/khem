@@ -62,7 +62,7 @@ export function loadWebLib(env) {
     if (!content) return "";
     const state = env._state;
     // Wrap reactive $vars in data-bind spans
-    return content.replace(
+    let result = content.replace(
       /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
       (match, name) => {
         if (name in state) {
@@ -72,6 +72,9 @@ export function loadWebLib(env) {
         return match;
       }
     );
+    // Restore escaped dollars
+    result = result.replace(/\x01/g, "$");
+    return result;
   };
 
   // Override set to handle reactive state

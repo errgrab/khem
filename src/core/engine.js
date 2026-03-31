@@ -11,10 +11,12 @@ export const lookup = (scope, name) => {
 
 export function sub(text, scope) {
   if (typeof text !== "string") return text;
-  return text.replace(
-    /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
-    (match, name) => lookup(scope, name) ?? match,
-  );
+  return text
+    .replace(
+      /\$([a-zA-Z_][a-zA-Z0-9_-]*)/g,
+      (match, name) => lookup(scope, name) ?? match,
+    )
+    .replace(/\x01/g, "$");
 }
 
 export function evaluate(commands, scope, env) {

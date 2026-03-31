@@ -57,6 +57,7 @@ export function parse(code) {
         escaped = false;
         if (c === "n") { s += "\n"; continue; }
         if (c === "t") { s += "\t"; continue; }
+        if (c === "$") { s += "\x01"; continue; } // \$ → escaped dollar
         // \", \\, etc. → literal char
       }
       s += c;
