@@ -1,14 +1,41 @@
 // src/compiler.js — Khem AST → { html, css, js }
 import { parse } from "./core/parser.js";
 
+const JS_RESERVED = new Set([
+  "break","case","catch","continue","debugger","default","delete","do","else",
+  "finally","for","function","if","in","instanceof","new","return","switch",
+  "throw","try","typeof","var","void","while","with","class","const","enum",
+  "export","extends","import","super","implements","interface","let","package",
+  "private","protected","public","static","yield","await","async",
+]);
+
+function sanitizeId(name) {
+  return JS_RESERVED.has(name) ? "_" + name : name;
+}
+
 function jsStr(s) {
   return JSON.stringify(String(s));
 }
 
-// Convert $var: global → __s["x"], local → x
+// Convert $var: global → __s.x, local → sanitized local name
+// locals can be a Set or Map (Map maps original→sanitized)
 function compileRef(name, locals) {
-  if (locals && locals.has(name)) return name;
-  return `__s[${jsStr(name)}]`;
+  const bare = name.startsWith("$") ? name.slice(1) : name;
+  if (locals) {
+    if (locals instanceof Map) { if (locals.has(bare)) return locals.get(bare); }
+    else if (locals.has(bare)) return bare;
+  }
+  return `__s.${bare}`;
+}
+
+// Compile ref for set target: always __s[key], resolving local name if needed
+function compileSetRef(name, locals) {
+  const bare = name.startsWith("$") ? name.slice(1) : name;
+  if (locals) {
+    if (locals instanceof Map) { if (locals.has(bare)) return `__s[${locals.get(bare)}]`; }
+    else if (locals.has(bare)) return `__s[${bare}]`;
+  }
+  return `__s.${bare}`;
 }
 
 // Replace $var in expr string (numeric)
@@ -25,18 +52,52 @@ function contentSub(s, locals) {
     .replace(/\x02/g, "$");
 }
 
+// Resolve $var in arg strings to bare references (no concat wrapping)
+// Used for proc call args and attribute values
+function resolveArgSub(s, locals) {
+  return s
+    .replace(/\x01([a-zA-Z_][a-zA-Z0-9_-]*)/g, (_, n) => `$${n}`)
+    .replace(/\$([a-zA-Z_][a-zA-Z0-9_-]*)/g, (_, n) => compileRef(n, locals))
+    .replace(/\x02/g, "$");
+}
+
 // Compile a single content part — string or nested array (from [brackets])
-function compileContentPart(arg, locals, procNames) {
+// If noQuote is true, return bare references (for proc args/attr values)
+function compileContentPart(arg, locals, procNames, noQuote) {
   if (typeof arg === "string") {
+    if (noQuote) {
+      const resolved = resolveArgSub(arg, locals);
+      return resolved === arg ? jsStr(arg) : resolved;
+    }
     const subbed = contentSub(arg, locals);
-    return subbed === arg ? jsStr(arg) : `"${subbed}"`;
+    if (subbed === arg) return jsStr(arg);
+    // Use JSON.stringify if subbed contains quotes (would break simple wrapping)
+    if (subbed.includes('"')) return jsStr(subbed);
+    return `"${subbed}"`;
   }
   if (Array.isArray(arg)) {
-    // Nested command substitution — compile as expression
-    if (arg.length === 1 && Array.isArray(arg[0])) {
-      const c = arg[0];
-      const fn = c[0];
-      const fargs = c.slice(1).map(a => typeof a === "string" ? jsStr(a) : compileContentPart(a, locals, procNames));
+    // Nested command substitution (from bracket in text) or direct proc call array
+    let cmd;
+    if (arg.length >= 1 && Array.isArray(arg[0])) {
+      cmd = arg[0]; // [["fn", args...]] → ["fn", args...]
+    } else {
+      cmd = arg; // ["fn", args...] directly
+    }
+    if (cmd.length >= 1) {
+      const fn = cmd[0];
+      const fargs = cmd.slice(1).map(a => {
+        if (typeof a === "string") {
+          if (noQuote) {
+            const resolved = resolveArgSub(a, locals);
+            return resolved === a ? jsStr(a) : resolved;
+          }
+          const sub = contentSub(a, locals);
+          if (sub === a) return jsStr(a);
+          if (sub.includes('"')) return jsStr(sub);
+          return `"${sub}"`;
+        }
+        return compileContentPart(a, locals, procNames, noQuote);
+      });
       return `${fn}(${fargs.join(", ")})`;
     }
     return jsStr(String(arg));
@@ -47,7 +108,7 @@ function compileContentPart(arg, locals, procNames) {
 // Compile set command to JS statement (for render function)
 function compileSetStmt(cmd, locals, out) {
   const args = cmd.slice(1);
-  const ref = compileRef(args[0] || "", locals);
+  const ref = compileSetRef(args[0] || "", locals);
   if (args[1] === "expr" && typeof args[2] === "string") {
     const e = compileExpr(args[2], locals);
     out.push(`${ref}=String((function(){try{return eval(${jsStr(e)})}catch{return 0}})())`);
@@ -59,10 +120,28 @@ function compileSetStmt(cmd, locals, out) {
 // Compile set command for event handler (plain string, no JSON.stringify on eval)
 function compileSetHandler(cmd, locals, out) {
   const args = cmd.slice(1);
-  const ref = compileRef(args[0] || "", locals);
+  const ref = compileSetRef(args[0] || "", locals);
   if (args[1] === "expr" && typeof args[2] === "string") {
     const e = compileExpr(args[2], locals);
     out.push(`${ref}=String((function(){try{return eval("${e.replace(/"/g, '\\"')}")}catch{return 0}})())`);
+  } else if (args[1] === "expr" && Array.isArray(args[2])) {
+    // expr with bracket proc call: set $var expr [proc args]
+    const bracket = args[2];
+    if (bracket.length >= 1 && Array.isArray(bracket[0])) {
+      const c = bracket[0];
+      const fn = c[0];
+      const fargs = c.slice(1).map(a => {
+        if (typeof a === "string") {
+          const resolved = resolveArgSub(a, locals);
+          return resolved === a ? jsStr(a) : resolved;
+        }
+        return compileContentPart(a, locals, null, true);
+      });
+      // fn returns an expression string — eval it
+      out.push(`${ref}=String((function(){try{return eval(${fn}(${fargs.join(", ")}))}catch{return 0}})())`);
+    } else {
+      out.push(`${ref}=String(${jsStr(String(bracket))})`);
+    }
   } else {
     // Use String() wrapper to avoid quote conflicts in onclick handler
     const val = String(args[1] ?? "").replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -130,24 +209,32 @@ function compileEventAttr(cmd, locals) {
 // Returns { attrStr, contentCmds } where attrStr is like ' class="app" id="x"'
 function extractAttrs(body, locals) {
   const cmds = parse(typeof body === "string" ? body : "");
-  let attrStr = "";
+  let staticAttrs = "";
+  let dynamicAttrs = []; // array of JS expressions for dynamic parts
   const contentCmds = [];
   for (const cmd of cmds) {
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
     const n = cmd[0], a = cmd.slice(1);
-    if (n === "class") attrStr += ` class=${jsStr(a[0] ?? "")}`;
-    else if (n === "id") attrStr += ` id=${jsStr(a[0] ?? "")}`;
-    else if (n === "href") attrStr += ` href=${jsStr(a[0] ?? "")}`;
-    else if (n === "src") attrStr += ` src=${jsStr(a[0] ?? "")}`;
-    else if (n === "type") attrStr += ` type=${jsStr(a[0] ?? "")}`;
-    else if (n === "value") attrStr += ` value=${jsStr(a[0] ?? "")}`;
-    else if (n === "placeholder") attrStr += ` placeholder=${jsStr(a[0] ?? "")}`;
-    else if (n === "data") attrStr += ` data-${a[0] ?? ""}=${jsStr(a[1] ?? "")}`;
-    else if (n === "attr") attrStr += ` ${a[0] ?? ""}=${jsStr(a[1] ?? "")}`;
-    else if (n === "on" || n.startsWith("on_")) attrStr += compileEventAttr(cmd, locals);
-    else contentCmds.push(cmd);
+    if (n === "on" || n.startsWith("on_")) {
+      dynamicAttrs.push({ expr: compileEventAttr(cmd, locals) });
+    } else if (["class","id","href","src","type","value","placeholder"].includes(n)) {
+      const val = a[0];
+      if (Array.isArray(val)) {
+        // Dynamic attribute — store attr name and expression
+        const expr = compileContentPart(val, locals, null, true);
+        dynamicAttrs.push({ name: n, expr });
+      } else {
+        staticAttrs += ` ${n}=${jsStr(val ?? "")}`;
+      }
+    } else if (n === "data") {
+      staticAttrs += ` data-${a[0] ?? ""}=${jsStr(a[1] ?? "")}`;
+    } else if (n === "attr") {
+      staticAttrs += ` ${a[0] ?? ""}=${jsStr(a[1] ?? "")}`;
+    } else {
+      contentCmds.push(cmd);
+    }
   }
-  return { attrStr, contentCmds };
+  return { staticAttrs, dynamicAttrs, contentCmds };
 }
 
 // Compile list of content commands to JS expression
@@ -162,11 +249,32 @@ function compileContentCmds(cmds, locals, procNames) {
 
 // Compile element (tag + body) to JS expression
 function compileElement(tag, body, locals, procNames) {
-  const { attrStr, contentCmds } = extractAttrs(body, locals);
+  const { staticAttrs, dynamicAttrs, contentCmds } = extractAttrs(body, locals);
   const content = compileContentCmds(contentCmds, locals, procNames);
   const voids = new Set(["br","hr","img","input","meta","link","area","base","col","embed","source","track","wbr"]);
-  if (voids.has(tag)) return jsStr(`<${tag}${attrStr}>`);
-  return jsStr(`<${tag}${attrStr}>`) + " + " + content + " + " + jsStr(`</${tag}>`);
+  const openTag = `<${tag}${staticAttrs}>`;
+  const closeTag = voids.has(tag) ? "" : `</${tag}>`;
+  if (dynamicAttrs.length === 0) {
+    if (voids.has(tag)) return jsStr(openTag);
+    return jsStr(openTag) + " + " + content + " + " + jsStr(closeTag);
+  }
+  // Has dynamic attrs: interleave static string with dynamic expressions
+  const parts = [jsStr(`<${tag}${staticAttrs}`)];
+  for (const da of dynamicAttrs) {
+    if (da.name) {
+      parts.push(jsStr(` ${da.name}="`));
+      parts.push(da.expr);
+      parts.push(jsStr('"'));
+    } else {
+      // Event handler or full attr string — already a complete attribute string
+      parts.push(jsStr(da.expr));
+    }
+  }
+  parts.push(jsStr('>')); // close the opening tag
+  if (!voids.has(tag)) {
+    parts.push(" + " + content + " + " + jsStr(closeTag));
+  }
+  return parts.join(" + ");
 }
 
 // Compile one content command to JS expression (or null)
@@ -177,8 +285,24 @@ function compileOneContent(cmd, locals, procNames) {
   switch (name) {
     case "text": {
       // Handle multiple args (text "prefix" [proc] "suffix")
-      // and array args (text [proc args])
-      const parts = args.map(a => compileContentPart(a, locals, procNames));
+      // Text needs static strings quoted and dynamic vars as expressions
+      const parts = args.flatMap(a => {
+        if (typeof a === "string") {
+          // Split into static and dynamic parts
+          const segments = a.split(/(\$[a-zA-Z_][a-zA-Z0-9_-]*)/);
+          return segments.map(seg => {
+            if (!seg) return null; // empty
+            if (seg.startsWith("$")) {
+              // Variable reference — return as expression
+              return compileRef(seg, locals);
+            }
+            // Static text — return as quoted string
+            return jsStr(seg);
+          }).filter(Boolean);
+        }
+        // Array arg (proc call) — compile as expression
+        return [compileContentPart(a, locals, procNames, true)];
+      });
       return parts.length === 0 ? jsStr("") : parts.join(" + ");
     }
     case "elem":
@@ -209,6 +333,27 @@ function compileOneContent(cmd, locals, procNames) {
       const b = compileContentBody(args[2], feLocals, procNames);
       return `(function(){var __r="";(${l}).split(" ").forEach(function(${v}){__r+=${b}});return __r})()`;
     }
+    case "match": {
+      const expr = typeof args[0] === "string"
+        ? compileExpr(args[0], locals)
+        : jsStr(args[0]);
+      const arms = parse(args[1] || "");
+      let result = '""'; // default fallback
+      for (let i = arms.length - 1; i >= 0; i--) {
+        const arm = arms[i];
+        if (!Array.isArray(arm) || arm.length < 2) continue;
+        const val = arm[0]; // "76" or "default"
+        const armBody = arm[1]; // body string
+        const compiled = compileContentBody(armBody, locals, procNames);
+        if (val === "default") {
+          result = compiled;
+        } else {
+          const cond = `(${expr} == ${val})`;
+          result = `(${cond}) ? (${compiled}) : (${result})`;
+        }
+      }
+      return `(${result})`;
+    }
     case "proc": case "set": case "on": case "state":
       return null;
     default: {
@@ -222,11 +367,19 @@ function compileOneContent(cmd, locals, procNames) {
       if (blockTags.has(name)) return compileElement(name, args[0] || "", locals, procNames);
       if (name === "br" || name === "hr") return jsStr(`<${name}>`);
       if (name === "img") return jsStr(`<img src=${jsStr(args[0] ?? "")} alt=${jsStr(args[1] ?? "")}>`);
-      // Proc call (Bug 1, 3): compile as function call
+      // Proc call: compile as function call
       if (procNames && procNames.has(name)) {
-        const fargs = args.map(a =>
-          typeof a === "string" ? jsStr(a) : compileContentPart(a, locals, procNames)
-        );
+        const fargs = args.map(a => {
+          if (typeof a === "string") {
+            // Resolve $var refs in proc args to bare references
+            if (a.includes("$")) {
+              const resolved = resolveArgSub(a, locals);
+              return resolved === a ? jsStr(a) : resolved;
+            }
+            return jsStr(a);
+          }
+          return compileContentPart(a, locals, procNames, true);
+        });
         return `${name}(${fargs.join(", ")})`;
       }
       return null;
@@ -304,25 +457,42 @@ export function compile(ast, env) {
     const name = cmd[1];
     const rawParams = cmd[2] || "";
     const body = cmd[3];
-    const paramCmds = parse(rawParams);
-    const params = paramCmds.map(p => typeof p === "string" ? p : String(p[0]));
-    const locals = new Set(params);
+    // Split params by ; or whitespace
+    const rawParamsList = rawParams.split(/[;\s]+/).filter(Boolean);
+    // Sanitize param names (e.g. "var" → "_var")
+    const locals = new Map();
+    const params = rawParamsList.map(p => { const s = sanitizeId(p); locals.set(p, s); return s; });
     procJS.push(`function ${name}(${params.join(", ")}){return ${compileProcBody(body, locals, procNames)}}`);
   }
 
-  // Compile render body
+  // Separate top-level set commands (init) from render content
+  const initSets = [];
+  const renderBody = [];
+  for (const cmd of renderCmds) {
+    if (Array.isArray(cmd) && cmd[0] === "set") initSets.push(cmd);
+    else renderBody.push(cmd);
+  }
+
+  // Apply top-level set to state initialization
+  for (const cmd of initSets) {
+    const args = cmd.slice(1);
+    const key = args[0] || "";
+    if (args[1] === "expr" && typeof args[2] === "string") {
+      // For init expr, evaluate at compile time if possible, otherwise store as-is
+      state[key] = args[2];
+    } else {
+      state[key] = args[1] ?? "";
+    }
+  }
+
+  // Compile render body (no set commands)
   const locals = new Set();
   const renderStmts = [];
-  for (const cmd of renderCmds) {
+  for (const cmd of renderBody) {
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
-    const n = cmd[0];
-    if (n === "set") {
-      compileSetStmt(cmd, locals, renderStmts);
-    } else {
-      const expr = compileOneContent(cmd, locals, procNames);
-      if (expr !== null) {
-        renderStmts.push(expr);
-      }
+    const expr = compileOneContent(cmd, locals, procNames);
+    if (expr !== null) {
+      renderStmts.push(expr);
     }
   }
 

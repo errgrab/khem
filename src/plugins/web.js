@@ -112,6 +112,13 @@ export function loadWebLib(env) {
     return null;
   };
 
+  // Override set to also register in env._state (makes all set vars reactive)
+  const origSet = c["set"];
+  c["set"] = ([key, value], scope) => {
+    if (key) env._state[key] = value ?? "";
+    return origSet([key, value], scope);
+  };
+
   // text "$var" — plain substitution from env._state
   c["text"] = ([content]) => {
     if (!content) return "";

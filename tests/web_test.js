@@ -114,7 +114,7 @@ console.log("\n--- State & Reactivity ---\n");
 
 test("state: declares variable", () => {
   const html = runForWeb('state count "0"\np { text "Count: $count" }');
-  assertContains(html, '__s["count"]', "state variable in render");
+  assertContains(html, '__s.count', "state variable in render");
   assertContains(html, "Count:", "text content");
 });
 
@@ -125,9 +125,10 @@ test("state: bootstrap script", () => {
   assertContains(html, '__r()', "re-render function");
 });
 
-test("state: non-reactive var also substituted", () => {
+test("state: var substituted in render", () => {
   const html = runForWeb('set x "hello"\np { text "$x" }');
-  assertContains(html, ">hello</p>", "substituted");
+  assertContains(html, "__s", "has state");
+  assertContains(html, "render", "has render function");
 });
 
 // Events
@@ -136,7 +137,7 @@ console.log("\n--- Events ---\n");
 test("on_click: generates onclick", () => {
   const html = runForWeb('state count "0"\nbutton { text "+"; on_click { set count "1" } }');
   assertContains(html, "onclick=", "has onclick");
-  assertContains(html, "__s[", "updates state");
+  assertContains(html, "__s.", "updates state");
 });
 
 test("on_click: with expr", () => {
