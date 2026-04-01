@@ -1,35 +1,8 @@
 import { parse } from "../core/parser.js";
 import { evaluate, createScope } from "../core/engine.js";
 import { compile } from "../compiler.js";
-import { VOID_ELEMENTS, BLOCK_TAGS } from "../shared.js";
+import { VOID_ELEMENTS, BLOCK_TAGS, parseCSS } from "../shared.js";
 import { DEFAULT_CSS } from "../styles.js";
-
-// ─── CSS parser (syntax khem → CSS) ─────────────────────────────────────────
-
-function parseCSS(src, env) {
-  const ev = (t) =>
-    Array.isArray(t)
-      ? evaluate(t, { vars: env.vars, parent: null }, env).join("")
-      : String(t);
-
-  function format(cmds, indent = "") {
-    return parse(cmds).map(cmd => {
-      const last = cmd[cmd.length - 1];
-      // Se o último token tem ; ou \n, é um bloco aninhado (selector { ... })
-      if (typeof last === "string" && /[;\n]/.test(last)) {
-        const selector = cmd.slice(0, -1).map(ev).join(" ");
-        const inner = format(last, indent + "  ");
-        return `${indent}${selector} {\n${inner}${indent}}`;
-      }
-      // Propriedade normal: prop: val;
-      const prop = ev(cmd[0]);
-      const vals = cmd.slice(1).map(ev).join(" ");
-      return `${indent}${prop}: ${vals};`;
-    }).join("\n") + "\n";
-  }
-
-  return format(src);
-}
 
 // ─── Helpers de elemento ─────────────────────────────────────────────────────
 
@@ -203,7 +176,10 @@ export function loadWebLib(env) {
   // ── Style ──
 
   c["style"] = ([src]) => {
-    if (src) ctx.styles.push(parseCSS(src, env));
+    if (src) {
+      const evalFn = (t) => evaluate(t, { vars: env.vars, parent: null }, env).join("");
+      ctx.styles.push(parseCSS(src, evalFn));
+    }
     return null;
   };
 

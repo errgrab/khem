@@ -1,6 +1,6 @@
 // src/compiler.js — Khem AST → { html, css, js }
 import { parse } from "./core/parser.js";
-import { VOID_ELEMENTS, BLOCK_TAGS, VAR_PATTERN, sanitizeId, jsStr } from "./shared.js";
+import { VOID_ELEMENTS, BLOCK_TAGS, VAR_PATTERN, sanitizeId, jsStr, parseCSS } from "./shared.js";
 
 // ─── Referências de variáveis ────────────────────────────────────────────────
 
@@ -423,7 +423,7 @@ export function compile(ast, env) {
     if (!Array.isArray(cmd) || cmd.length === 0) continue;
     const n = cmd[0];
     if (n === "state") state[cmd[1]] = cmd[2] ?? "";
-    else if (n === "style") cssBlocks.push(cmd[1] || "");
+    else if (n === "style") cssBlocks.push(parseCSS(cmd[1] || ""));
     else if (n === "proc") procFuncs.push(cmd);
     else renderCmds.push(cmd);
   }
