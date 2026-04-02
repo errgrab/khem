@@ -1,17 +1,13 @@
-import { parse } from "../src/core/parser.js";
-import { evaluate, createScope } from "../src/core/engine.js";
-import { loadStdLib } from "../src/plugins/stdlib.js";
+import Khem from "../src/khem.js";
 import { loadWebLib, generateHTML } from "../src/plugins/web.js";
 
 function runForWeb(code) {
   try {
-    const env = { cmds: {}, vars: {}, _state: {} };
-    loadStdLib(env);
-    loadWebLib(env);
-    env._source = code;
-    const scope = createScope();
-    env._output = evaluate(parse(code), scope, env).join("");
-    return generateHTML(env);
+    const khem = new Khem();
+    loadWebLib(khem);
+    khem._source = code;
+    khem._output = khem.run(code);
+    return generateHTML(khem);
   } catch (e) {
     console.error("Error:", e);
     return "";

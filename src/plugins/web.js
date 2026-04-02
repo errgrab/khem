@@ -1,8 +1,9 @@
-import { parse } from "../core/parser.js";
-import { evaluate, createScope } from "../core/engine.js";
+import Khem from "../khem.js";
 import { compile } from "../compiler.js";
 import { VOID_ELEMENTS, BLOCK_TAGS, parseCSS } from "../shared.js";
 import { DEFAULT_CSS } from "../styles.js";
+
+const parse = Khem.Parser.lex;
 
 // ─── Helpers de elemento ─────────────────────────────────────────────────────
 
@@ -23,10 +24,10 @@ function popElemContext(env, prev) {
 }
 
 // Avalia body de elemento e retorna conteúdo HTML
-function evalElementBody(body, scope, env) {
+function evalElementBody(body, vm) {
   const bodyStr = typeof body === "string" ? body : "";
   try {
-    return evaluate(parse(bodyStr), scope, env).join("");
+    return vm.evaluate(bodyStr).join("");
   } catch {
     return bodyStr;
   }
@@ -45,9 +46,9 @@ function buildAttrStr(attrs, events) {
 }
 
 // Renderiza elemento HTML completo
-function renderElement(tag, body, scope, env) {
+function renderElement(tag, body, vm, env) {
   const prev = pushElemContext(env);
-  const content = evalElementBody(body, scope, env);
+  const content = evalElementBody(body, vm);
   const { attrs, events } = popElemContext(env, prev);
   const attrStr = buildAttrStr(attrs, events);
 
@@ -58,60 +59,61 @@ function renderElement(tag, body, scope, env) {
 // ─── Load Web Library ───────────────────────────────────────────────────────
 
 export function loadWebLib(env) {
-  const c = env.cmds;
+  const c = env.scope.commands;
   const ctx = { styles: [] };
   env._webCtx = ctx;
   env._state = env._state || {};
 
+  const vm = env.vm;
+
   // ── Elementos ──
 
-  c["elem"] = ([tag, body], scope) => renderElement(tag || "div", body, scope, env);
+  c.set("elem", ([tag, body]) => renderElement(tag || "div", body, vm, env));
 
-  c["a"] = ([href, body], scope) => {
+  c.set("a", ([href, body]) => {
     const prev = pushElemContext(env);
     env._elemAttrs = { href: href ?? "#" };
-    const content = evalElementBody(body, scope, env);
+    const content = evalElementBody(body, vm);
     const { attrs, events } = popElemContext(env, prev);
     return `<a${buildAttrStr(attrs, events)}>${content}</a>`;
-  };
+  });
 
-  c["img"] = ([src, alt], scope) => {
+  c.set("img", ([src, alt]) => {
     const prev = pushElemContext(env);
     env._elemAttrs = { src: src ?? "", alt: alt ?? "" };
     const { attrs } = popElemContext(env, prev);
     return `<img${buildAttrStr(attrs, {})}>`;
-  };
+  });
 
   // Block tags: div, span, p, h1, etc → todos chamam elem
-  // (depois de a/img para não sobrescrever handlers especiais)
   for (const tag of BLOCK_TAGS) {
-    if (tag === "a" || tag === "img") continue; // já tratados acima
-    c[tag] = ([body], scope) => renderElement(tag, body, scope, env);
+    if (tag === "a" || tag === "img") continue;
+    c.set(tag, ([body]) => renderElement(tag, body, vm, env));
   }
 
-  c["br"] = () => "<br>";
-  c["hr"] = () => "<hr>";
+  c.set("br", () => "<br>");
+  c.set("hr", () => "<hr>");
 
   // ── Atributos ──
 
-  c["attr"] = ([key, value]) => {
+  c.set("attr", ([key, value]) => {
     if (env._elemAttrs) { env._elemAttrs[key] = value ?? ""; return null; }
     return ` ${key}="${value ?? ""}"`;
-  };
+  });
 
   // Atalhos de atributos
-  c["class"] = ([name]) => c["attr"](["class", name]);
-  c["id"] = ([name]) => c["attr"](["id", name]);
-  c["data"] = ([key, val]) => c["attr"]([`data-${key}`, val]);
-  c["href"] = ([url]) => c["attr"](["href", url]);
-  c["src"] = ([url]) => c["attr"](["src", url]);
-  c["type"] = ([val]) => c["attr"](["type", val]);
-  c["value"] = ([val]) => c["attr"](["value", val]);
-  c["placeholder"] = ([val]) => c["attr"](["placeholder", val]);
+  c.set("class", ([name]) => c.get("attr")(["class", name]));
+  c.set("id", ([name]) => c.get("attr")(["id", name]));
+  c.set("data", ([key, val]) => c.get("attr")([`data-${key}`, val]));
+  c.set("href", ([url]) => c.get("attr")(["href", url]));
+  c.set("src", ([url]) => c.get("attr")(["src", url]));
+  c.set("type", ([val]) => c.get("attr")(["type", val]));
+  c.set("value", ([val]) => c.get("attr")(["value", val]));
+  c.set("placeholder", ([val]) => c.get("attr")(["placeholder", val]));
 
   // ── Eventos ──
 
-  c["on"] = ([event, body]) => {
+  c.set("on", ([event, body]) => {
     const bodyStr = typeof body === "string" ? body : "";
     const bodyAST = parse(bodyStr);
     const lines = [];
@@ -138,31 +140,31 @@ export function loadWebLib(env) {
 
     if (env._elemEvents) { env._elemEvents[event] = js; return null; }
     return ` on${event}='${js}'`;
-  };
+  });
 
   // Atalhos de eventos
-  c["on_click"] = ([body]) => c["on"](["click", body]);
-  c["on_input"] = ([body]) => c["on"](["input", body]);
-  c["on_change"] = ([body]) => c["on"](["change", body]);
-  c["on_submit"] = ([body]) => c["on"](["submit", body]);
-  c["on_keydown"] = ([body]) => c["on"](["keydown", body]);
+  c.set("on_click", ([body]) => c.get("on")(["click", body]));
+  c.set("on_input", ([body]) => c.get("on")(["input", body]));
+  c.set("on_change", ([body]) => c.get("on")(["change", body]));
+  c.set("on_submit", ([body]) => c.get("on")(["submit", body]));
+  c.set("on_keydown", ([body]) => c.get("on")(["keydown", body]));
 
   // ── Estado ──
 
-  c["state"] = ([name, value]) => {
+  c.set("state", ([name, value]) => {
     if (name) env._state[name] = value ?? "";
     return null;
-  };
+  });
 
   // Override set para registrar em env._state (torna vars reativas)
-  const origSet = c["set"];
-  c["set"] = ([key, value], scope) => {
+  const origSet = c.get("set");
+  c.set("set", ([key, value]) => {
     if (key) env._state[key] = value ?? "";
-    return origSet([key, value], scope);
-  };
+    return origSet([key, value], vm);
+  });
 
   // text com substituição de $var do state
-  c["text"] = ([content]) => {
+  c.set("text", ([content]) => {
     if (!content) return "";
     const state = env._state;
     return content
@@ -171,23 +173,23 @@ export function loadWebLib(env) {
         name in state ? String(state[name]) : match
       )
       .replace(/\x02/g, "$");
-  };
+  });
 
   // ── Style ──
 
-  c["style"] = ([src]) => {
+  c.set("style", ([src]) => {
     if (src) {
-      const evalFn = (t) => evaluate(t, { vars: env.vars, parent: null }, env).join("");
+      const evalFn = (t) => vm.evaluate(t).join("");
       ctx.styles.push(parseCSS(src, evalFn));
     }
     return null;
-  };
+  });
 
   // ── Compatibilidade (no-ops) ──
 
-  c["page"] = () => null;
-  c["route"] = () => null;
-  c["title"] = () => null;
+  c.set("page", () => null);
+  c.set("route", () => null);
+  c.set("title", () => null);
 }
 
 // ─── HTML Generation ─────────────────────────────────────────────────────────
@@ -202,7 +204,7 @@ export function generateHTML(env) {
   // Modo reativo: compila AST → JS puro
   if (Object.keys(state).length > 0 && env._source) {
     const ast = parse(env._source);
-    const result = compile(ast, env);
+    const result = compile(ast);
     const allCSS = DEFAULT_CSS + "\n" + result.css;
 
     return `<!DOCTYPE html>

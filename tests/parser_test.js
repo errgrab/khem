@@ -1,4 +1,5 @@
-import { parse } from "../src/core/parser.js";
+import Khem from "../src/khem.js";
+const parse = Khem.Parser.lex;
 
 function assertEqual(actual, expected, msg) {
   const actualStr = JSON.stringify(actual);

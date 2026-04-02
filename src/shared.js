@@ -1,5 +1,6 @@
 // src/shared.js — constantes e helpers usados por compiler.js e web.js
-import { parse } from "./core/parser.js";
+import Khem from "./khem.js";
+const parse = Khem.Parser.lex;
 
 // HTML void elements (não têm tag de fechamento)
 export const VOID_ELEMENTS = new Set([
