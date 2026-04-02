@@ -1,6 +1,5 @@
 // src/shared.js — constantes e helpers usados por compiler.js e web.js
-import Khem from "./khem.js";
-const parse = Khem.Parser.lex;
+// Note: parseCSS now handles string input directly, no need to import Khem.Parser
 
 // HTML void elements (não têm tag de fechamento)
 export const VOID_ELEMENTS = new Set([
@@ -48,8 +47,102 @@ export function parseCSS(src, evalFn) {
     if (Array.isArray(t)) return evalFn ? evalFn(t) : t.join(" ");
     return String(t);
   };
+  
   function format(cmds, indent = "") {
-    return parse(cmds).map(cmd => {
+    // Parse CSS input - handle both array and string
+    let parsed;
+    if (typeof cmds === "string") {
+      // Handle string input like ".app { padding 24px }"
+      // Split by "{" to separate selector from body
+      const braceIdx = cmds.indexOf("{");
+      if (braceIdx === -1) {
+        return ""; // No brace, invalid CSS
+      }
+      
+      let selector = cmds.slice(0, braceIdx).trim();
+      // Remove surrounding quotes from selector if present
+      if ((selector.startsWith('"') && selector.endsWith('"')) ||
+          (selector.startsWith("'") && selector.endsWith("'"))) {
+        selector = selector.slice(1, -1);
+      }
+      
+      const body = cmds.slice(braceIdx + 1).replace(/}$/, "").trim();
+      
+      if (!body) {
+        return `${indent}${selector} {}`;
+      }
+      
+      // Split body by ";" to get properties
+      const props = body.split(";").map(s => s.trim()).filter(Boolean);
+      const cssProps = props.map(prop => {
+        const idx = prop.indexOf(" ");
+        if (idx === -1) return `${prop};`;
+        return `${prop.slice(0, idx).trim()}: ${prop.slice(idx + 1).trim()};`;
+      }).join("\n" + indent);
+      
+      return `${indent}${selector} {\n${indent}${cssProps}\n${indent}}`;
+    } else if (Array.isArray(cmds)) {
+      parsed = cmds;
+    } else {
+      parsed = [cmds];
+    }
+    
+    return parsed.map(cmd => {
+      if (typeof cmd === "string") {
+        // Block selector with nested content
+        if (cmd.includes("{")) {
+          const parts = cmd.split("{");
+          let selector = parts[0].trim();
+          // Remove surrounding quotes from selector if present
+          if ((selector.startsWith('"') && selector.endsWith('"')) ||
+              (selector.startsWith("'") && selector.endsWith("'"))) {
+            selector = selector.slice(1, -1);
+          }
+          const body = parts.slice(1).join("{").replace(/}$/, "").trim();
+          return `${indent}${selector} {\n${format(body, indent + "  ")}${indent}}`;
+        }
+        // Simple property (no colon but has space - treat as property)
+        if (cmd.includes(" ") && !cmd.includes(":")) {
+          const idx = cmd.indexOf(" ");
+          return `${indent}${cmd.slice(0, idx).trim()}: ${cmd.slice(idx + 1).trim()};`;
+        }
+        // Property with colon
+        const colonIdx = cmd.indexOf(":");
+        if (colonIdx !== -1) {
+          return `${indent}${cmd.slice(0, colonIdx).trim()}: ${cmd.slice(colonIdx + 1).trim()};`;
+        }
+        return `${indent}${cmd}`;
+      }
+      
+      // Array command: [selector, body] - like [".app", "padding 24px"]
+      if (cmd.length >= 2) {
+        let selector = ev(cmd[0]);
+        // Remove surrounding quotes from selector if present
+        if ((selector.startsWith('"') && selector.endsWith('"')) ||
+            (selector.startsWith("'") && selector.endsWith("'"))) {
+          selector = selector.slice(1, -1);
+        }
+        const body = cmd.slice(1).join(" ");
+        // Check if body ends with ; or \n (indicating nested block in original syntax)
+        const last = cmd[cmd.length - 1];
+        if (typeof last === "string" && /[;\n]/.test(last)) {
+          const selectorPart = cmd.slice(0, -1).map(ev).join(" ");
+          return `${indent}${selectorPart} {\n${format(last, indent + "  ")}${indent}}`;
+        }
+        // Body is properties - convert space-separated to CSS
+        const props = body.split(";").map(s => s.trim()).filter(Boolean);
+        if (props.length === 0) {
+          return `${indent}${selector} {}`;
+        }
+        const cssProps = props.map(prop => {
+          const idx = prop.indexOf(" ");
+          if (idx === -1) return `${prop};`;
+          return `${prop.slice(0, idx).trim()}: ${prop.slice(idx + 1).trim()};`;
+        }).join("\n" + indent);
+        return `${indent}${selector} {\n${indent}${cssProps}\n${indent}}`;
+      }
+      
+      // Simple array command
       const last = cmd[cmd.length - 1];
       // Se o último token tem ; ou \n, é um bloco aninhado (selector { ... })
       if (typeof last === "string" && /[;\n]/.test(last)) {

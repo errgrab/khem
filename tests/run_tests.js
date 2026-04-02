@@ -1,4 +1,6 @@
-import { run, createEnvironment, parse, evaluate, runForWeb } from "../src/index.js";
+import Khem from "../src/khem.js";
+import { loadWebLib, generateHTML } from "../src/plugins/web.js";
+import { run, createEnvironment, parse } from "../src/index.js";
 
 const results = {
   passed: 0,
@@ -6,7 +8,23 @@ const results = {
   suites: {}
 };
 
-function test(name, fn, suite) {
+function assertEqual(actual, expected, msg) {
+  if (actual !== expected) throw new Error(`${msg}: expected "${expected}", got "${actual}"`);
+}
+
+function assertContains(str, substring, msg) {
+  if (!str.includes(substring))
+    throw new Error(`${msg}: expected to contain "${substring}"`);
+}
+
+function test(name, fn, suite = []) {
+  const grepIndex = process.argv.indexOf("--grep");
+  const filter = grepIndex !== -1 ? process.argv[grepIndex + 1] : null;
+  
+  if (filter && !name.includes(filter)) {
+    return;
+  }
+
   try {
     fn();
     results.passed++;
@@ -17,10 +35,6 @@ function test(name, fn, suite) {
     suite.push({ name, pass: false, msg: e.message });
     console.log(`  ✗ ${name}: ${e.message}`);
   }
-}
-
-function assertEqual(actual, expected, msg) {
-  if (actual !== expected) throw new Error(`${msg}: expected "${expected}", got "${actual}"`);
 }
 
 console.log("\n=== Running Tests ===\n");
@@ -77,7 +91,6 @@ test("if: false condition", () => {
 test("for: basic loop", () => {
   const env = createEnvironment();
   run("for i 1 3 { puts $i }", env);
-  // loop executed without error = pass
 }, stdlibSuite);
 
 // Web Tests
@@ -124,3 +137,5 @@ import { writeFileSync } from "node:fs";
 writeFileSync("tests/results.json", JSON.stringify(results, null, 2));
 console.log("Results written to tests/results.json");
 console.log("Open tests/runner.html to view styled results");
+
+if (results.failed > 0) process.exit(1);

@@ -1,5 +1,46 @@
-# todo.kh — Simple reactive todo list
+# todo.kh — Reactive todo list with toggling, deleting, and filtering
+# Click item to toggle active/done. × removes it. Filters show All/Active/Done.
+
 state count "3"
+state show "0"
+state d1 "0"; state d2 "0"; state d3 "0"
+
+proc todo_item { num label state_var } {
+  if $state_var eq "0" {
+    div { class "item"; on_click { set $state_var "1" }
+      span { class "item-text"; text $label };
+      button { class "delete"; text "×"; on_click { set $state_var "2" } }
+    }
+  };
+  if $state_var eq "1" {
+    div { class "item item-done"; on_click { set $state_var "0" }
+      span { class "item-text"; text $label };
+      button { class "delete"; text "×"; on_click { set $state_var "2" } }
+    }
+  }
+}
+
+proc filter_item { num label state_var show_val } {
+  if $show_val eq "0" {
+    todo_item $num $label $state_var
+  };
+  if $show_val eq "1" {
+    if $state_var eq "0" { todo_item $num $label $state_var }
+  };
+  if $show_val eq "2" {
+    if $state_var eq "1" { todo_item $num $label $state_var }
+  }
+}
+
+proc filter_label { show } {
+  if $show eq "0" { text "All" };
+  if $show eq "1" { text "Active" };
+  if $show eq "2" { text "Done" }
+}
+
+proc next_show { cur } {
+  expr "($cur + 1) % 3"
+}
 
 div { class "app";
   div { class "header";
@@ -10,13 +51,14 @@ div { class "app";
     input { class "add-input"; placeholder "Add a task..." };
     button { text "Add"; on_click { set count expr "$count + 1" } }
   };
-  div { class "item"; span { class "item-text"; text "Buy milk" }; button { text "×" } };
-  div { class "item"; span { class "item-text"; text "Call John" }; button { text "×" } };
-  div { class "item"; span { class "item-text"; text "Finish report" }; button { text "×" } };
+  filter_item "1" "Buy milk" "d1" $show;
+  filter_item "2" "Call John" "d2" $show;
+  filter_item "3" "Finish report" "d3" $show;
   div { class "filter-row";
-    button { text "All" };
-    button { text "Active" };
-    button { text "Done" }
+    button { class "chip"; text "All"; on_click { set show "0" } };
+    button { class "chip"; text "Active"; on_click { set show "1" } };
+    button { class "chip"; text "Done"; on_click { set show "2" } };
+    button { class "chip"; text [filter_label $show]; on_click { set show [next_show $show] } }
   }
 }
 
@@ -54,12 +96,36 @@ style {
     padding 8px 0
     border-bottom 1px solid var(--border)
     gap 8px
+    cursor pointer
   }
+  .item:hover { opacity 0.8 }
+  .item-done { opacity 0.45 }
+  .item-done .item-text { text-decoration line-through }
   .item-text { flex 1; font-size 12px; color var(--fg1) }
+  .delete {
+    background none
+    border none
+    color var(--fg3)
+    font-size 14px
+    cursor pointer
+    padding 2px 6px
+  }
+  .delete:hover { color var(--red) }
   .filter-row {
     display flex
     gap 6px
     padding-top 12px
     border-top 1px solid var(--border)
   }
+  .chip {
+    font-size 9px
+    padding 2px 8px
+    border 1px solid var(--border)
+    color var(--fg3)
+    text-transform uppercase
+    letter-spacing 0.08em
+    cursor pointer
+    background none
+  }
+  .chip:hover { border-color var(--acc); color var(--acc) }
 }

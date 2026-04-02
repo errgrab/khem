@@ -25,6 +25,13 @@ function assertNotContains(str, substring, msg) {
 
 let passed = 0, failed = 0;
 function test(name, fn) {
+  const grepIndex = process.argv.indexOf("--grep");
+  const filter = grepIndex !== -1 ? process.argv[grepIndex + 1] : null;
+  
+  if (filter && !name.includes(filter)) {
+    return;
+  }
+
   try { fn(); passed++; console.log(`  ✓ ${name}`); }
   catch (e) { failed++; console.log(`  ✗ ${name}: ${e.message}`); }
 }

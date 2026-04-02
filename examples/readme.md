@@ -33,21 +33,21 @@ A four-operation calculator with a button grid.
 Demonstrates: `state`, `on_click`, `set expr`, conditional display.
 
 #### `todo.kh`
-A task list with add button and static items.
+A reactive task list — click items to toggle active/done, delete with ×, filter by All/Active/Done.
 
-Demonstrates: `state`, `on_click`, input fields, styled components.
+Demonstrates: `state`, `on_click`, `proc`, `if` conditionals, input fields, styled components.
 
 #### `fizzbuzz.kh`
-Classic FizzBuzz with prev/next navigation.
+Classic FizzBuzz with prev/next navigation and dynamic result display.
 
-Demonstrates: `state`, `on_click`, `set expr`, CSS grid.
+Demonstrates: `state`, `on_click`, `set expr`, `proc`, `if`, `expr` arithmetic, CSS grid.
 
 ### 📊 Data & Layout
 
 #### `log-viewer.kh`
-A static event log with level-coded entries and filter chips.
+An event log with working filter chips — click All/Info/Warn/Error to filter entries.
 
-Demonstrates: CSS grid, semantic color classes, dark-theme styling.
+Demonstrates: `state`, `on_click`, `proc`, `if` conditionals, CSS grid, semantic color classes, dark-theme styling.
 
 #### `invoice.kh`
 A static invoice layout with parties, line items, and totals.

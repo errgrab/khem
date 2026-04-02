@@ -1,12 +1,40 @@
 # fizzbuzz.kh — Dynamic FizzBuzz with state
+# Prev/Next navigate numbers. Result shows the FizzBuzz value.
+# Uses chained procs with match for multi-condition logic.
+
 state n "1"
+state _fb ""
+
+proc fizzbuzz_step3 { i } {
+  set _fb expr "$i % 3";
+  match $_fb {
+    "0" { text "Fizz" }
+    default { text $i }
+  }
+}
+
+proc fizzbuzz_step2 { i } {
+  set _fb expr "$i % 5";
+  match $_fb {
+    "0" { text "Buzz" }
+    default { fizzbuzz_step3 $i }
+  }
+}
+
+proc fizzbuzz_label { i } {
+  set _fb expr "$i % 15";
+  match $_fb {
+    "0" { text "FizzBuzz" }
+    default { fizzbuzz_step2 $i }
+  }
+}
 
 div { class "app";
   h1 { text "FizzBuzz" };
   p { class "current"; text "Number: $n" };
-  div { class "result"; text "$n" };
+  div { class "result"; text [fizzbuzz_label $n] };
   div { class "controls";
-    button { text "Prev"; on_click { set n expr "$n - 1" } };
+    button { text "Prev"; on_click { set n expr "Math.max(1, $n - 1)" } };
     button { text "Next"; on_click { set n expr "$n + 1" } }
   };
   div { class "grid";

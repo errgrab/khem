@@ -28,7 +28,8 @@
     "url": "https://github.com/errgrab/khem/issues"
   },
   "homepage": "https://github.com/errgrab/khem#readme",
-  "devDependencies": {
+  "dependencies": {
     "esbuild": "^0.27.4"
-  }
+  },
+  "devDependencies": {}
 }

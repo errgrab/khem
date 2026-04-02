@@ -1,0 +1,22 @@
+# Source code
+src/
+bin/
+
+# Development
+tests/
+docs/
+examples/
+
+# IDE and tools
+.kilo/
+ide.html
+
+# Git
+.git/
+.gitignore
+
+# Build output (published separately if needed)
+# khem.js is kept for CDN use
+
+# Configs
+AGENTS.md

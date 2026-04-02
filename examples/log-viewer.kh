@@ -1,40 +1,45 @@
-# log-viewer.kh — Static log feed
+# log-viewer.kh — Event log with working filter chips
+# Click a filter chip to show only entries of that level.
+
+state filter "all"
+
+proc log_entry { level msg filt } {
+  if $filt eq "all" {
+    div { class "log-row";
+      span { class "lvl lvl-$level"; text $level };
+      span { class "msg"; text $msg }
+    }
+  };
+  if $filt eq $level {
+    div { class "log-row";
+      span { class "lvl lvl-$level"; text $level };
+      span { class "msg"; text $msg }
+    }
+  }
+}
+
+proc chip_class { label filt } {
+  if $filt eq $label { text "chip chip-active" };
+  if $filt neq $label { text "chip" }
+}
 
 div { class "app";
   div { class "toolbar";
     span { class "title"; text "Event Log" };
     div { class "filter-row";
-      button { class "chip chip-active"; text "All" };
-      button { class "chip"; text "Info" };
-      button { class "chip"; text "Warn" };
-      button { class "chip"; text "Error" }
+      button { class [chip_class "all" $filter]; text "All"; on_click { set filter "all" } };
+      button { class [chip_class "info" $filter]; text "Info"; on_click { set filter "info" } };
+      button { class [chip_class "warn" $filter]; text "Warn"; on_click { set filter "warn" } };
+      button { class [chip_class "error" $filter]; text "Error"; on_click { set filter "error" } }
     }
   };
   div { class "log-table";
-    div { class "log-row";
-      span { class "lvl lvl-info"; text "info" };
-      span { class "msg"; text "Server started on port 4173" }
-    };
-    div { class "log-row";
-      span { class "lvl lvl-info"; text "info" };
-      span { class "msg"; text "Environment: production" }
-    };
-    div { class "log-row";
-      span { class "lvl lvl-warn"; text "warn" };
-      span { class "msg"; text "Memory usage above 80%" }
-    };
-    div { class "log-row";
-      span { class "lvl lvl-error"; text "error" };
-      span { class "msg"; text "Failed to connect to cache: ECONNREFUSED" }
-    };
-    div { class "log-row";
-      span { class "lvl lvl-info"; text "info" };
-      span { class "msg"; text "Request: GET / 200 in 4ms" }
-    };
-    div { class "log-row";
-      span { class "lvl lvl-warn"; text "warn" };
-      span { class "msg"; text "Slow query detected: 340ms" }
-    }
+    log_entry "info" "Server started on port 4173" $filter;
+    log_entry "info" "Environment: production" $filter;
+    log_entry "warn" "Memory usage above 80%" $filter;
+    log_entry "error" "Failed to connect to cache: ECONNREFUSED" $filter;
+    log_entry "info" "Request: GET / 200 in 4ms" $filter;
+    log_entry "warn" "Slow query detected: 340ms" $filter
   }
 }
 
@@ -62,7 +67,10 @@ style {
     color var(--fg3)
     text-transform uppercase
     letter-spacing 0.08em
+    cursor pointer
+    background none
   }
+  .chip:hover { border-color var(--acc); color var(--acc) }
   .chip-active {
     font-size 9px
     padding 2px 8px
@@ -70,6 +78,8 @@ style {
     color var(--acc)
     text-transform uppercase
     letter-spacing 0.08em
+    cursor pointer
+    background none
   }
   .log-table {
     display flex
