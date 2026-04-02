@@ -1,4 +1,6 @@
+.gitignore
 node_modules/
 .DS_Store
 .opencode/
 .kilo/
+AGENTS.md
